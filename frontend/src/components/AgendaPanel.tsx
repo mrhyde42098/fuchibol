@@ -88,7 +88,7 @@ export function AgendaPanel({ events, onSelectChannel }: AgendaPanelProps) {
                       onClick={() => onSelectChannel(opt.channelId, opt.name)}
                       className="flex items-center gap-2 rounded-full bg-white/[0.04] py-1 pl-1 pr-3 text-xs text-white/70 transition hover:bg-electric/15 hover:text-white"
                     >
-                      <ChannelLogo name={opt.name} size="sm" />
+                      <ChannelLogo name={opt.name} channelId={opt.channelId} size="sm" />
                       <span>{opt.name}</span>
                       {opt.quality && (
                         <span className="text-[10px] text-white/30">{opt.quality.replace('Calidad ', '')}</span>

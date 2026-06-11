@@ -65,7 +65,7 @@ export function ChannelGrid({
                     : 'hover:bg-white/[0.05]'
               }`}
             >
-              <ChannelLogo name={ch.name} logo={ch.logo} size="md" active={isActive} />
+              <ChannelLogo name={ch.name} logo={ch.logo} channelId={ch.id} size="md" active={isActive} />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-white/90">{ch.name}</p>
                 <div className="mt-0.5 flex items-center gap-2 text-[10px]">

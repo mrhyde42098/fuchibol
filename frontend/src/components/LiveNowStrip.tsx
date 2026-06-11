@@ -40,7 +40,7 @@ export function LiveNowStrip({ channels, activeId, onSelect }: LiveNowStripProps
                   : 'bg-white/[0.04] hover:bg-white/[0.08]'
               }`}
             >
-              <ChannelLogo name={ch.name} logo={ch.logo} size="md" active={active} />
+              <ChannelLogo name={ch.name} logo={ch.logo} channelId={ch.id} size="md" active={active} />
               <div className="text-left">
                 <p className={`max-w-[120px] truncate text-xs font-medium ${active ? 'text-white' : 'text-white/80'}`}>
                   {ch.name}

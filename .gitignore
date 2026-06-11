@@ -9,4 +9,14 @@ backend/test-*.json
 *.apk
 Golea-release.apk
 golea-analysis/apk-extracted/
+golea-analysis/source-extracted/
 golea-analysis/live-main.js
+golea-analysis/live-main-new.js
+golea-analysis/live-index.html
+golea-analysis/*.zip
+golea-analysis/*.apk
+golea-analysis/headers-*.txt
+golea-analysis/manifest*.m3u8
+golea-analysis/*.json
+!golea-analysis/channels.json
+!golea-analysis/agenda.json

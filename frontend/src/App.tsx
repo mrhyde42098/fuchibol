@@ -139,7 +139,7 @@ export default function App() {
         </div>
         {activeChannel && (
           <div className="flex items-center gap-3">
-            <ChannelLogo name={activeChannel.name} logo={activeChannel.logo} size="sm" active />
+            <ChannelLogo name={activeChannel.name} logo={activeChannel.logo} channelId={activeChannel.id} size="sm" active />
             <div className="hidden text-right sm:block">
               <p className="text-[10px] uppercase tracking-wider text-white/35">Ahora</p>
               <p className="text-sm font-medium text-white">{activeChannel.name}</p>
@@ -148,8 +148,8 @@ export default function App() {
         )}
       </header>
 
-      <main className="relative z-10 mx-auto flex w-full max-w-[1600px] flex-1 flex-col px-4 pb-8 sm:px-8">
-        <div className="w-full lg:mx-auto lg:w-[78%]">
+      <main className="relative z-10 mx-auto flex w-full max-w-[1920px] flex-1 flex-col px-3 pb-8 sm:px-6">
+        <div className="w-full">
           <StadiumPlayer
             src={streamUrl}
             channelName={activeChannel?.name ?? 'Selecciona un canal'}
@@ -157,7 +157,7 @@ export default function App() {
           />
         </div>
 
-        <section className="mt-6 w-full lg:mx-auto lg:w-[78%]">
+        <section className="mt-5 w-full max-w-[1500px] mx-auto">
           <LiveNowStrip
             channels={featured}
             activeId={activeChannel?.id ?? null}

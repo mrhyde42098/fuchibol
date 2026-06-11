@@ -6,6 +6,7 @@ import { resolveStreamXhdManifest } from '../scrapers/pelota-libre.scraper.js';
 import { resolveTvtvhdManifest } from '../scrapers/tvtvhd.scraper.js';
 import { decodeBase64Url, slugFromStreamParam } from '../scrapers/base.scraper.js';
 import { findChannelById } from './catalog.service.js';
+import { pickHighestQualityManifest } from '../proxy/hls-quality.service.js';
 import { buildProxyUrl } from './token.service.js';
 import { logger } from '../utils/logger.js';
 
@@ -60,6 +61,8 @@ async function resolveUpstreamM3u8(channelId: string): Promise<string> {
 
     m3u8 = await resolveStreamXhdManifest(slug);
   }
+
+  m3u8 = await pickHighestQualityManifest(m3u8);
 
   setCachedManifest(channelId, m3u8);
   return m3u8;

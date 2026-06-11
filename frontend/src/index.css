@@ -56,3 +56,17 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 102, 255, 0.5);
 }
+
+.stadium-video {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+.stadium-screen:fullscreen,
+.stadium-screen:fullscreen .stadium-video {
+  width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  object-fit: contain;
+  background: #000;
+}

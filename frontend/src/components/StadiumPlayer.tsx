@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 import { LoadingSpinner } from './LoadingSpinner';
 import { OffsideBanner } from './OffsideBanner';
+import { applyHighestLevel, createHlsInstance, formatQualityLabel } from '../utils/hlsConfig';
 
 interface StadiumPlayerProps {
   src: string | null;
@@ -19,7 +20,13 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
   const [muted, setMuted] = useState(true);
   const [playing, setPlaying] = useState(false);
   const [volume, setVolume] = useState(0.7);
+  const [qualityLabel, setQualityLabel] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const retryCountRef = useRef(0);
+
+  const updateQuality = useCallback((hls: Hls) => {
+    setQualityLabel(formatQualityLabel(hls));
+  }, []);
 
   const destroyHls = useCallback(() => {
     if (hlsRef.current) {
@@ -36,27 +43,27 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
       destroyHls();
       setLoading(true);
       setOffside(false);
+      setQualityLabel(null);
       retryCountRef.current = 0;
 
       video.muted = true;
       setMuted(true);
 
       if (Hls.isSupported()) {
-        const hls = new Hls({
-          enableWorker: true,
-          lowLatencyMode: true,
-          backBufferLength: 60,
-          maxBufferLength: 30,
-        });
+        const hls = createHlsInstance(Hls);
         hlsRef.current = hls;
 
         hls.loadSource(url);
         hls.attachMedia(video);
 
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          applyHighestLevel(hls);
+          updateQuality(hls);
           setLoading(false);
           video.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
         });
+
+        hls.on(Hls.Events.LEVEL_SWITCHED, () => updateQuality(hls));
 
         hls.on(Hls.Events.ERROR, (_event, data) => {
           if (!data.fatal) return;
@@ -83,6 +90,7 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
           'loadedmetadata',
           () => {
             setLoading(false);
+            setQualityLabel('Auto');
             video.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
           },
           { once: true },
@@ -98,7 +106,7 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
         );
       }
     },
-    [destroyHls, onStreamFailed],
+    [destroyHls, onStreamFailed, updateQuality],
   );
 
   useEffect(() => {
@@ -106,11 +114,18 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
       destroyHls();
       setLoading(false);
       setOffside(false);
+      setQualityLabel(null);
       return;
     }
     loadStream(src);
     return destroyHls;
   }, [src, loadStream, destroyHls]);
+
+  useEffect(() => {
+    const onFs = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', onFs);
+    return () => document.removeEventListener('fullscreenchange', onFs);
+  }, []);
 
   const togglePlay = () => {
     const video = videoRef.current;
@@ -151,6 +166,13 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
     }
   };
 
+  const forceHd = () => {
+    const hls = hlsRef.current;
+    if (!hls) return;
+    applyHighestLevel(hls);
+    updateQuality(hls);
+  };
+
   const handleRetry = () => {
     if (src) loadStream(src);
   };
@@ -158,39 +180,54 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
   return (
     <div
       ref={containerRef}
-      className="group relative aspect-video w-full overflow-hidden rounded-2xl bg-[#050a18] shadow-[0_0_80px_rgba(0,0,0,0.6),inset_0_0_120px_rgba(0,102,255,0.04)] ring-1 ring-white/5"
+      className={`stadium-screen group relative w-full overflow-hidden rounded-2xl bg-[#03060f] shadow-[0_0_100px_rgba(0,0,0,0.75),inset_0_0_140px_rgba(0,102,255,0.05)] ring-1 ring-white/8 ${
+        isFullscreen ? 'h-screen max-h-screen rounded-none' : 'aspect-video min-h-[min(58vh,820px)] max-h-[82vh]'
+      }`}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
     >
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_40%,rgba(0,0,0,0.7)_100%)]" />
+      <div className="pointer-events-none absolute inset-0 z-[1] bg-[radial-gradient(ellipse_at_center,transparent_50%,rgba(0,0,0,0.55)_100%)]" />
 
       <video
         ref={videoRef}
-        className="h-full w-full object-contain"
+        className="stadium-video relative z-0 h-full w-full object-contain"
         playsInline
         muted
         autoPlay
       />
 
+      {qualityLabel && !loading && (
+        <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={forceHd}
+            className="rounded-full bg-black/50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-electric backdrop-blur-md ring-1 ring-electric/30 transition hover:bg-electric/20"
+            title="Forzar máxima calidad"
+          >
+            {qualityLabel}
+          </button>
+        </div>
+      )}
+
       {loading && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-stadium/60">
-          <LoadingSpinner />
+          <LoadingSpinner label="Cargando señal HD..." />
         </div>
       )}
 
       {offside && !loading && <OffsideBanner onRetry={handleRetry} />}
 
       <div
-        className={`absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-5 pb-4 pt-16 transition-opacity duration-300 ${
-          hovering ? 'opacity-100' : 'opacity-0'
+        className={`absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-5 pb-4 pt-20 transition-opacity duration-300 ${
+          hovering || isFullscreen ? 'opacity-100' : 'opacity-0'
         }`}
       >
-        <p className="mb-3 truncate text-sm font-medium text-white/80">{channelName}</p>
+        <p className="mb-3 truncate text-sm font-medium text-white/85">{channelName}</p>
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={togglePlay}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition hover:bg-electric"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition hover:bg-electric"
             aria-label={playing ? 'Pausar' : 'Reproducir'}
           >
             {playing ? (
@@ -208,7 +245,7 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
           <button
             type="button"
             onClick={toggleMute}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition hover:bg-electric"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition hover:bg-electric"
             aria-label={muted ? 'Activar sonido' : 'Silenciar'}
           >
             {muted || volume === 0 ? (
@@ -229,7 +266,7 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
             step={0.05}
             value={muted ? 0 : volume}
             onChange={(e) => handleVolume(Number(e.target.value))}
-            className="h-1 w-20 cursor-pointer appearance-none rounded-full bg-white/20 accent-electric"
+            className="h-1 w-24 cursor-pointer appearance-none rounded-full bg-white/20 accent-electric"
             aria-label="Volumen"
           />
 
@@ -238,7 +275,7 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
           <button
             type="button"
             onClick={toggleFullscreen}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition hover:bg-electric"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition hover:bg-electric"
             aria-label="Pantalla completa"
           >
             <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current">
