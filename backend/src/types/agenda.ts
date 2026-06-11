@@ -17,4 +17,11 @@ export interface AgendaEvent {
   link?: string;
   channelId: string | null;
   channels?: AgendaChannelOption[];
+  /** TheSportsDB idEvent cuando hay match */
+  externalEventId?: string;
+  tsdbLeague?: string;
+  homeScore?: number | null;
+  awayScore?: number | null;
+  /** Fin estimado o confirmado (ISO) — se oculta al pasar */
+  endsAt?: string;
 }

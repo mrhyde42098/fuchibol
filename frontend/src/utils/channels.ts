@@ -35,7 +35,13 @@ export const SIGNAL_FILTERS: { id: SignalFilter; label: string }[] = [
 
 export function isLiveAgendaStatus(status: string): boolean {
   const s = status.toUpperCase();
+  if (s.includes('FIN') || s.includes('FT')) return false;
   return s.includes('VIVO') || s.includes('LIVE') || s.includes('EN CURSO');
+}
+
+export function isFinishedAgendaStatus(status: string): boolean {
+  const s = status.toUpperCase();
+  return s.includes('FIN') || s.includes('FT');
 }
 
 export function isChannelLiveSignal(ch: Channel): boolean {

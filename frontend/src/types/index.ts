@@ -37,6 +37,11 @@ export interface AgendaEvent {
   link?: string;
   channelId: string | null;
   channels?: AgendaChannelOption[];
+  externalEventId?: string;
+  tsdbLeague?: string;
+  homeScore?: number | null;
+  awayScore?: number | null;
+  endsAt?: string;
 }
 
 export interface StreamUrlResponse {

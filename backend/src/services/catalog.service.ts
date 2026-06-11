@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { env } from '../config/env.js';
 import { MemoryCache } from '../cache/memory-cache.js';
 import { scrapeLa18hdChannels } from '../scrapers/la18hd.scraper.js';
-import { scrapePelotaLibreAgenda, scrapePelotaLibreChannels } from '../scrapers/pelota-libre.scraper.js';
+import { loadEnrichedAgenda } from './agenda.service.js';
+import { scrapePelotaLibreChannels } from '../scrapers/pelota-libre.scraper.js';
 import { scrapeTvtvhdChannels } from '../scrapers/tvtvhd.scraper.js';
 import type { AgendaEvent } from '../types/agenda.js';
 import type { PublicChannel, RawChannel } from '../types/channel.js';
@@ -48,12 +49,6 @@ async function loadFallbackChannels(): Promise<RawChannel[]> {
   return JSON.parse(raw) as RawChannel[];
 }
 
-async function loadFallbackAgenda(): Promise<AgendaEvent[]> {
-  const path = resolve(projectRoot, env.fallbackAgendaPath);
-  const raw = await readFile(path, 'utf8');
-  return JSON.parse(raw) as AgendaEvent[];
-}
-
 function mergeChannelsInto(target: Map<string, PublicChannel>, rawList: RawChannel[]): void {
   for (const ch of rawList) {
     const normalized = normalizeChannel(ch);
@@ -89,23 +84,6 @@ async function loadChannels(): Promise<PublicChannel[]> {
   return Array.from(merged.values());
 }
 
-async function loadAgenda(): Promise<AgendaEvent[]> {
-  try {
-    const events = await scrapePelotaLibreAgenda();
-    if (events.length > 0) return events;
-  } catch (err) {
-    logger.warn({ err }, 'Agenda scraper failed');
-  }
-
-  try {
-    logger.warn('Loading fallback agenda.json');
-    return await loadFallbackAgenda();
-  } catch (err) {
-    logger.warn({ err }, 'Fallback agenda unavailable');
-    return [];
-  }
-}
-
 export const channelsCache = new MemoryCache<PublicChannel[]>(
   'channels',
   env.cacheChannelsTtlMs,
@@ -115,7 +93,7 @@ export const channelsCache = new MemoryCache<PublicChannel[]>(
 export const agendaCache = new MemoryCache<AgendaEvent[]>(
   'agenda',
   env.cacheAgendaTtlMs,
-  loadAgenda
+  loadEnrichedAgenda
 );
 
 export function getChannels(): { data: PublicChannel[]; status: ReturnType<MemoryCache<PublicChannel[]>['get']>['status'] } {

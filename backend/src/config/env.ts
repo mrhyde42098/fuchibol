@@ -22,7 +22,7 @@ export const env = {
   publicBaseUrl: str('PUBLIC_BASE_URL', 'http://localhost:4000').replace(/\/$/, ''),
   tokenSecret: str('TOKEN_SECRET', 'dev-secret-change-in-production-min-32-chars'),
   cacheChannelsTtlMs: num('CACHE_CHANNELS_TTL_MS', 600_000),
-  cacheAgendaTtlMs: num('CACHE_AGENDA_TTL_MS', 300_000),
+  cacheAgendaTtlMs: num('CACHE_AGENDA_TTL_MS', 90_000),
   tokenTtlMs: num('TOKEN_TTL_MS', 900_000),
   streamResolveCacheMs: num('STREAM_RESOLVE_CACHE_MS', 60_000),
   logLevel: str('LOG_LEVEL', 'info'),
@@ -40,6 +40,13 @@ export const env = {
   streamAuditTimeoutMs: num('STREAM_AUDIT_TIMEOUT_MS', 12_000),
   streamAuditDegradedMs: num('STREAM_AUDIT_DEGRADED_MS', 4_000),
   streamAuditFailThreshold: num('STREAM_AUDIT_FAIL_THRESHOLD', 3),
+  thesportsdbEnabled: str('THESPORTSDB_ENABLED', 'true') !== 'false',
+  thesportsdbApiKey: str('THESPORTSDB_API_KEY', '3'),
+  thesportsdbCacheMs: num('THESPORTSDB_CACHE_MS', 180_000),
+  thesportsdbTimeoutMs: num('THESPORTSDB_TIMEOUT_MS', 12_000),
+  thesportsdbRequestDelayMs: num('THESPORTSDB_REQUEST_DELAY_MS', 700),
+  /** true = solo 1–4 peticiones por refresh (recomendado en plan gratuito) */
+  thesportsdbMinimalMode: str('THESPORTSDB_MINIMAL_MODE', 'true') !== 'false',
   profiles: {
     streamXhd: {
       origin: str('PROFILE_STREAM_XHD_ORIGIN', 'https://stream-xhd.com'),

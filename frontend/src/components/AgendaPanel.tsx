@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { AgendaEvent } from '../types';
-import { isLiveAgendaStatus, sportColor } from '../utils/channels';
+import { isFinishedAgendaStatus, isLiveAgendaStatus, sportColor } from '../utils/channels';
 import { ChannelLogo } from './ChannelLogo';
 
 interface AgendaPanelProps {
@@ -78,6 +78,16 @@ function EventCard({
             {ev.title}
           </h3>
 
+          {ev.homeScore != null && ev.awayScore != null && (
+            <p className="mt-1 font-display text-lg font-bold text-electric">
+              {ev.homeScore} - {ev.awayScore}
+            </p>
+          )}
+
+          {ev.tsdbLeague && (
+            <p className="mt-1 text-[10px] text-white/35">{ev.tsdbLeague}</p>
+          )}
+
           {(ev.channels?.length ?? 0) > 0 ? (
             <div className="mt-3 flex flex-wrap gap-2">
               {ev.channels!.map((opt) => (
@@ -118,6 +128,7 @@ export function AgendaPanel({ events, onSelectChannel }: AgendaPanelProps) {
     const liveEv: AgendaEvent[] = [];
     const upcomingEv: AgendaEvent[] = [];
     for (const ev of events) {
+      if (isFinishedAgendaStatus(ev.status)) continue;
       if (isLiveAgendaStatus(ev.status)) liveEv.push(ev);
       else upcomingEv.push(ev);
     }
