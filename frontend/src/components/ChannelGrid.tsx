@@ -2,10 +2,18 @@ import { useMemo, useState } from 'react';
 import type { Channel } from '../types';
 import {
   CHANNEL_GROUPS,
+  countChannelsBySignal,
   filterChannelsByQuery,
+  filterChannelsBySignal,
   groupChannelsByCategory,
   groupChannelsBySections,
+  isChannelLiveSignal,
+  isChannelOffline,
+  isChannelStandby,
+  SIGNAL_FILTERS,
+  signalLabel,
   type ChannelGroupId,
+  type SignalFilter,
   type TabCategory,
 } from '../utils/channels';
 import { ChannelLogo } from './ChannelLogo';
@@ -30,34 +38,44 @@ function ChannelRow({
   isActive: boolean;
   onSelect: () => void;
 }) {
-  const unavailable = ch.audit?.status === 'unavailable';
-  const degraded = ch.audit?.status === 'degraded';
+  const offline = isChannelOffline(ch);
+  const standby = isChannelStandby(ch);
+  const live = isChannelLiveSignal(ch);
+  const label = signalLabel(ch);
 
   return (
     <button
       type="button"
-      disabled={unavailable}
+      disabled={offline}
       onClick={onSelect}
       className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all ${
         isActive
           ? 'bg-electric/12 ring-1 ring-electric/40'
-          : unavailable
-            ? 'cursor-not-allowed opacity-30'
-            : 'hover:bg-white/[0.05]'
+          : offline
+            ? 'cursor-not-allowed opacity-35'
+            : standby
+              ? 'opacity-80 hover:bg-white/[0.05]'
+              : 'hover:bg-white/[0.05]'
       }`}
     >
       <ChannelLogo name={ch.name} logo={ch.logo} channelId={ch.id} size="md" active={isActive} />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-white/90">{ch.name}</p>
-        <div className="mt-0.5 flex gap-2 text-[10px]">
-          {unavailable ? (
-            <span className="text-red-400">Fuera</span>
-          ) : degraded ? (
-            <span className="text-amber-400">Débil</span>
-          ) : (
-            <span className="text-emerald-400">ON</span>
-          )}
-          {ch.audit?.isHd && <span className="text-electric">HD</span>}
+        <div className="mt-0.5 flex flex-wrap gap-2 text-[10px]">
+          <span
+            className={
+              live
+                ? 'text-emerald-400'
+                : standby
+                  ? 'text-amber-400'
+                  : offline
+                    ? 'text-red-400'
+                    : 'text-white/35'
+            }
+          >
+            {label}
+          </span>
+          {ch.audit?.isHd && live && <span className="text-electric">HD</span>}
         </div>
       </div>
     </button>
@@ -73,11 +91,19 @@ export function ChannelGrid({
 }: ChannelGridProps) {
   const [search, setSearch] = useState('');
   const [groupFilter, setGroupFilter] = useState<string | null>(null);
+  const [signalFilter, setSignalFilter] = useState<SignalFilter>('live');
 
-  const baseFiltered = useMemo(
-    () => filterChannelsByQuery(groupChannelsByCategory(channels, activeTab), search),
-    [channels, activeTab, search],
+  const tabChannels = useMemo(
+    () => groupChannelsByCategory(channels, activeTab),
+    [channels, activeTab],
   );
+
+  const signalCounts = useMemo(() => countChannelsBySignal(tabChannels), [tabChannels]);
+
+  const baseFiltered = useMemo(() => {
+    const bySignal = filterChannelsBySignal(tabChannels, signalFilter);
+    return filterChannelsByQuery(bySignal, search);
+  }, [tabChannels, signalFilter, search]);
 
   const sections = useMemo(() => {
     const map = groupChannelsBySections(baseFiltered, activeTab);
@@ -131,6 +157,32 @@ export function ChannelGrid({
         </div>
       </div>
 
+      <div className="flex flex-wrap gap-2">
+        {SIGNAL_FILTERS.map((f) => {
+          const count = signalCounts[f.id];
+          if (f.id !== 'all' && count === 0) return null;
+          return (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => {
+                setSignalFilter(f.id);
+                setGroupFilter(null);
+              }}
+              className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
+                signalFilter === f.id
+                  ? f.id === 'live'
+                    ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/30'
+                    : 'bg-electric/20 text-electric'
+                  : 'bg-white/[0.04] text-white/40 hover:text-white/70'
+              }`}
+            >
+              {f.label} ({count})
+            </button>
+          );
+        })}
+      </div>
+
       <div className="flex gap-2 overflow-x-auto pb-1">
         <button
           type="button"
@@ -139,11 +191,11 @@ export function ChannelGrid({
             !groupFilter ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70'
           }`}
         >
-          Todos
+          Todos los grupos
         </button>
         {CHANNEL_GROUPS.map((g) => {
           const count = groupChannelsBySections(
-            groupChannelsByCategory(channels, activeTab),
+            filterChannelsBySignal(tabChannels, signalFilter),
             activeTab,
           ).get(g.id)?.length;
           if (!count) return null;
@@ -190,7 +242,22 @@ export function ChannelGrid({
         })}
 
         {visibleGroups.length === 0 && (
-          <p className="py-10 text-center text-sm text-white/35">No hay canales que coincidan</p>
+          <div className="py-10 text-center">
+            <p className="text-sm text-white/35">
+              {signalFilter === 'live'
+                ? 'Aún no hay canales en línea en esta categoría. El sistema sigue verificando señales…'
+                : 'No hay canales que coincidan'}
+            </p>
+            {signalFilter === 'live' && (
+              <button
+                type="button"
+                onClick={() => setSignalFilter('all')}
+                className="mt-3 text-xs font-medium text-electric hover:underline"
+              >
+                Ver todos los canales
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>

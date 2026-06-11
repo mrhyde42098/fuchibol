@@ -23,25 +23,77 @@ export const CHANNEL_GROUPS = [
 
 export type ChannelGroupId = (typeof CHANNEL_GROUPS)[number]['id'];
 export type TabCategory = 'Latam' | 'Internacional' | 'Canales';
+export type SignalFilter = 'live' | 'all' | 'standby' | 'offline' | 'pending';
+
+export const SIGNAL_FILTERS: { id: SignalFilter; label: string }[] = [
+  { id: 'live', label: 'En línea' },
+  { id: 'all', label: 'Todos' },
+  { id: 'standby', label: 'En espera' },
+  { id: 'offline', label: 'Sin señal' },
+  { id: 'pending', label: 'Sin verificar' },
+];
 
 export function isLiveAgendaStatus(status: string): boolean {
   const s = status.toUpperCase();
   return s.includes('VIVO') || s.includes('LIVE') || s.includes('EN CURSO');
 }
 
+export function isChannelLiveSignal(ch: Channel): boolean {
+  return ch.audit?.signal === 'live' && ch.audit.status !== 'unavailable';
+}
+
+export function isChannelStandby(ch: Channel): boolean {
+  return ch.audit?.signal === 'standby';
+}
+
+export function isChannelOffline(ch: Channel): boolean {
+  return ch.audit?.signal === 'offline' || ch.audit?.status === 'unavailable';
+}
+
+export function isChannelPendingAudit(ch: Channel): boolean {
+  return !ch.audit?.signal || ch.audit.signal === 'unknown';
+}
+
 export function channelQualityScore(ch: Channel): number {
   const audit = ch.audit;
-  if (!audit) return 0;
-  if (audit.status === 'unavailable') return -100;
-  if (audit.status === 'degraded') return 20;
-  let score = 60;
+  if (!audit) return 5;
+  if (audit.signal === 'offline' || audit.status === 'unavailable') return -100;
+  if (audit.signal === 'standby') return 15;
+  if (audit.signal === 'unknown') return 8;
+  if (audit.status === 'degraded') return 35;
+  let score = 65;
   if (audit.isHd) score += 25;
   if (audit.latencyMs != null) score += Math.max(0, 15 - Math.floor(audit.latencyMs / 300));
   return score;
 }
 
 export function isChannelOnline(ch: Channel): boolean {
-  return ch.audit?.status === 'ok';
+  return isChannelLiveSignal(ch) && ch.audit?.status === 'ok';
+}
+
+export function filterChannelsBySignal(channels: Channel[], filter: SignalFilter): Channel[] {
+  switch (filter) {
+    case 'live':
+      return channels.filter(isChannelLiveSignal);
+    case 'standby':
+      return channels.filter(isChannelStandby);
+    case 'offline':
+      return channels.filter(isChannelOffline);
+    case 'pending':
+      return channels.filter(isChannelPendingAudit);
+    default:
+      return channels;
+  }
+}
+
+export function countChannelsBySignal(channels: Channel[]): Record<SignalFilter, number> {
+  return {
+    live: channels.filter(isChannelLiveSignal).length,
+    all: channels.length,
+    standby: channels.filter(isChannelStandby).length,
+    offline: channels.filter(isChannelOffline).length,
+    pending: channels.filter(isChannelPendingAudit).length,
+  };
 }
 
 export function getChannelGroup(ch: Channel): ChannelGroupId {
@@ -93,7 +145,7 @@ export function getFeaturedChannels(channels: Channel[], agenda: AgendaEvent[]):
   const liveIds = getLiveAgendaChannelIds(agenda);
 
   const scored = channels
-    .filter((ch) => ch.audit?.status !== 'unavailable')
+    .filter((ch) => isChannelLiveSignal(ch))
     .map((ch) => {
       let boost = channelQualityScore(ch);
       if (liveIds.has(ch.id)) boost += 50;
@@ -119,6 +171,17 @@ export function getFeaturedChannels(channels: Channel[], agenda: AgendaEvent[]):
   return result;
 }
 
+export function pickInitialChannel(channels: Channel[], agenda: AgendaEvent[]): Channel | undefined {
+  const featured = getFeaturedChannels(channels, agenda);
+  if (featured[0]) return featured[0];
+
+  return (
+    channels.find((c) => isChannelLiveSignal(c)) ??
+    channels.find((c) => !isChannelOffline(c)) ??
+    channels[0]
+  );
+}
+
 export function groupChannelsByCategory(channels: Channel[], tab: string): Channel[] {
   const filtered = channels.filter((ch) => {
     if (tab === 'Canales') return !['Latam', 'Internacional'].includes(ch.category);
@@ -134,6 +197,13 @@ export function filterChannelsByQuery(channels: Channel[], query: string): Chann
   return channels.filter(
     (ch) => ch.name.toLowerCase().includes(q) || ch.id.toLowerCase().includes(q),
   );
+}
+
+export function signalLabel(ch: Channel): string {
+  if (isChannelLiveSignal(ch)) return ch.audit?.status === 'ok' ? 'EN VIVO' : 'EN VIVO · débil';
+  if (isChannelStandby(ch)) return 'En espera';
+  if (isChannelOffline(ch)) return 'Sin señal';
+  return 'Verificando…';
 }
 
 export const SPORT_COLORS: Record<string, string> = {

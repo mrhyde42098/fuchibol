@@ -1,5 +1,9 @@
+export type SignalKind = 'live' | 'standby' | 'offline' | 'unknown';
+
 export interface ChannelAudit {
   status: 'ok' | 'degraded' | 'unavailable';
+  /** live = transmisión activa, standby = cartel/espera, offline = sin manifiesto */
+  signal: SignalKind;
   latencyMs: number | null;
   isHd: boolean;
   lastChecked: string;

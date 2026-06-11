@@ -1,5 +1,8 @@
+export type SignalKind = 'live' | 'standby' | 'offline' | 'unknown';
+
 export interface ChannelAudit {
   status: 'ok' | 'degraded' | 'unavailable';
+  signal: SignalKind;
   latencyMs: number | null;
   isHd: boolean;
   lastChecked: string;
@@ -40,4 +43,9 @@ export interface StreamUrlResponse {
   proxyUrl: string;
   proxied: boolean;
   expiresInMs: number;
+}
+
+export interface ChannelProbeResponse {
+  channelId: string;
+  audit: ChannelAudit;
 }

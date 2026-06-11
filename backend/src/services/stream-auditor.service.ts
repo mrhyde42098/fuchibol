@@ -1,28 +1,76 @@
 import { env } from '../config/env.js';
-import { channelsCache } from './catalog.service.js';
+import { agendaCache, channelsCache } from './catalog.service.js';
 import { resolveStreamForChannel } from './stream-resolver.service.js';
 import type { ChannelAudit } from '../types/channel.js';
+import { probeManifestSignal, type SignalKind } from './signal-probe.service.js';
 import { logger } from '../utils/logger.js';
 
 const auditStore = new Map<string, ChannelAudit>();
-let auditTimer: ReturnType<typeof setInterval> | null = null;
+let priorityTimer: ReturnType<typeof setInterval> | null = null;
+let backgroundTimer: ReturnType<typeof setInterval> | null = null;
 let auditRunning = false;
+let backgroundCursor = 0;
 
-const M3U8_MARKERS = ['#EXTM3U', '#EXT-X-STREAM-INF', '#EXTINF'];
+const POPULAR_CHANNEL_IDS = new Set([
+  'espn',
+  'espn2',
+  'espn3',
+  'espnar',
+  'espndeportes',
+  'premium-v2-dsports',
+  'premium-v2-foxsports',
+  'premium-v2-tycsports',
+  'premium-v2-tntsports',
+  'premium-v2-winsports',
+  'premium-v2-winsports2',
+  'tvtvhd-winsports2',
+  'tycsports',
+  'dsportsar',
+  'disney1',
+  'foxsports',
+  'tvtvhd-espn',
+]);
 
-function detectHd(manifestBody: string): boolean {
-  const lower = manifestBody.toLowerCase();
-  return (
-    lower.includes('1080') ||
-    lower.includes('720') ||
-    lower.includes('hd') ||
-    lower.includes('high')
-  );
+function isLiveAgendaStatus(status: string): boolean {
+  const s = status.toUpperCase();
+  return s.includes('VIVO') || s.includes('LIVE') || s.includes('EN CURSO');
 }
 
-function isValidM3u8(body: string, contentType: string | null): boolean {
-  if (contentType?.includes('mpegurl') || contentType?.includes('m3u8')) return true;
-  return M3U8_MARKERS.some((m) => body.includes(m));
+function getAgendaLiveChannelIds(): Set<string> {
+  const ids = new Set<string>();
+  const { data: agenda } = agendaCache.get();
+
+  for (const ev of agenda) {
+    if (!isLiveAgendaStatus(ev.status)) continue;
+    if (ev.channelId) ids.add(ev.channelId);
+    ev.channels?.forEach((c) => ids.add(c.channelId));
+  }
+
+  return ids;
+}
+
+function buildPriorityIds(allIds: string[]): string[] {
+  const liveAgenda = getAgendaLiveChannelIds();
+  const priority = allIds.filter(
+    (id) =>
+      liveAgenda.has(id) ||
+      POPULAR_CHANNEL_IDS.has(id) ||
+      /win.?sport|winsport/i.test(id),
+  );
+  return [...new Set(priority)];
+}
+
+function deriveStatus(
+  signal: SignalKind,
+  latencyMs: number,
+  failCount: number,
+): ChannelAudit['status'] {
+  if (signal === 'offline') {
+    return failCount >= env.streamAuditFailThreshold ? 'unavailable' : 'degraded';
+  }
+  if (signal === 'standby') return 'degraded';
+  if (latencyMs > env.streamAuditDegradedMs) return 'degraded';
+  return 'ok';
 }
 
 async function auditChannel(channelId: string): Promise<ChannelAudit> {
@@ -30,31 +78,17 @@ async function auditChannel(channelId: string): Promise<ChannelAudit> {
   const start = Date.now();
 
   try {
-    const { proxyUrl } = await resolveStreamForChannel(channelId);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), env.streamAuditTimeoutMs);
-
-    const res = await fetch(proxyUrl, {
-      method: 'GET',
-      signal: controller.signal,
-      headers: { Accept: 'application/vnd.apple.mpegurl,*/*' },
-    });
-    clearTimeout(timeout);
-
+    const { manifestUrl } = await resolveStreamForChannel(channelId);
+    const { signal, isHd } = await probeManifestSignal(manifestUrl);
     const latencyMs = Date.now() - start;
-    const contentType = res.headers.get('content-type');
-    const body = await res.text();
 
-    if (!res.ok || !isValidM3u8(body, contentType)) {
-      throw new Error(`Manifest inválido (${res.status})`);
+    if (signal === 'offline') {
+      throw new Error('Sin manifiesto HLS válido');
     }
 
-    const isHd = detectHd(body);
-    const status: ChannelAudit['status'] =
-      latencyMs > env.streamAuditDegradedMs ? 'degraded' : 'ok';
-
     return {
-      status,
+      status: deriveStatus(signal, latencyMs, 0),
+      signal,
       latencyMs,
       isHd,
       lastChecked: new Date().toISOString(),
@@ -62,11 +96,11 @@ async function auditChannel(channelId: string): Promise<ChannelAudit> {
     };
   } catch {
     const failCount = (prev?.failCount ?? 0) + 1;
-    const status: ChannelAudit['status'] =
-      failCount >= env.streamAuditFailThreshold ? 'unavailable' : 'degraded';
+    const signal: SignalKind = 'offline';
 
     return {
-      status,
+      status: deriveStatus(signal, 0, failCount),
+      signal,
       latencyMs: null,
       isHd: prev?.isHd ?? false,
       lastChecked: new Date().toISOString(),
@@ -76,6 +110,8 @@ async function auditChannel(channelId: string): Promise<ChannelAudit> {
 }
 
 async function runAuditBatch(channelIds: string[]): Promise<void> {
+  if (channelIds.length === 0) return;
+
   for (let i = 0; i < channelIds.length; i += env.streamAuditConcurrency) {
     const batch = channelIds.slice(i, i + env.streamAuditConcurrency);
     const results = await Promise.allSettled(batch.map((id) => auditChannel(id)));
@@ -88,6 +124,7 @@ async function runAuditBatch(channelIds: string[]): Promise<void> {
         const prev = auditStore.get(id);
         auditStore.set(id, {
           status: 'unavailable',
+          signal: 'offline',
           latencyMs: null,
           isHd: prev?.isHd ?? false,
           lastChecked: new Date().toISOString(),
@@ -98,26 +135,44 @@ async function runAuditBatch(channelIds: string[]): Promise<void> {
   }
 }
 
-function prioritizeAuditOrder(ids: string[]): string[] {
-  const winSports = ids.filter((id) => /win.?sport|winsport/i.test(id));
-  const rest = ids.filter((id) => !/win.?sport|winsport/i.test(id));
-  return [...winSports, ...rest];
-}
-
-async function runFullAudit(): Promise<void> {
+async function runPriorityAudit(): Promise<void> {
   if (auditRunning) return;
   auditRunning = true;
 
   try {
     const { data: channels } = channelsCache.get();
-    const ids = prioritizeAuditOrder(channels.map((c) => c.id));
-    logger.info({ count: ids.length }, 'Stream audit started');
+    const allIds = channels.map((c) => c.id);
+    const ids = buildPriorityIds(allIds);
+    logger.info({ count: ids.length }, 'Priority stream audit started');
     await runAuditBatch(ids);
-    logger.info({ audited: auditStore.size }, 'Stream audit completed');
+    logger.info({ audited: auditStore.size }, 'Priority stream audit completed');
   } catch (err) {
-    logger.warn({ err }, 'Stream audit failed');
+    logger.warn({ err }, 'Priority stream audit failed');
   } finally {
     auditRunning = false;
+  }
+}
+
+async function runBackgroundAuditSlice(): Promise<void> {
+  if (auditRunning) return;
+
+  try {
+    const { data: channels } = channelsCache.get();
+    const allIds = channels.map((c) => c.id);
+    if (allIds.length === 0) return;
+
+    const batch: string[] = [];
+    const batchSize = env.streamAuditBackgroundBatch;
+
+    for (let i = 0; i < batchSize; i++) {
+      batch.push(allIds[(backgroundCursor + i) % allIds.length]);
+    }
+    backgroundCursor = (backgroundCursor + batchSize) % allIds.length;
+
+    logger.info({ batch: batch.length, cursor: backgroundCursor }, 'Background audit slice');
+    await runAuditBatch(batch);
+  } catch (err) {
+    logger.warn({ err }, 'Background stream audit failed');
   }
 }
 
@@ -130,12 +185,29 @@ export function getAllAudits(): Map<string, ChannelAudit> {
 }
 
 export function channelSortScore(audit?: ChannelAudit): number {
-  if (!audit) return 50;
-  if (audit.status === 'unavailable') return 0;
-  if (audit.status === 'degraded') return 30;
+  if (!audit) return 5;
+
+  if (audit.signal === 'offline' || audit.status === 'unavailable') return 0;
+  if (audit.signal === 'standby') return 22;
+  if (audit.signal === 'unknown') return 12;
+
+  if (audit.status === 'degraded') return 38;
+
   const hdBonus = audit.isHd ? 20 : 0;
-  const latencyBonus = audit.latencyMs != null ? Math.max(0, 20 - Math.floor(audit.latencyMs / 200)) : 0;
-  return 60 + hdBonus + latencyBonus;
+  const latencyBonus =
+    audit.latencyMs != null ? Math.max(0, 20 - Math.floor(audit.latencyMs / 200)) : 0;
+  return 70 + hdBonus + latencyBonus;
+}
+
+export function isAuditStale(audit: ChannelAudit | undefined, maxAgeMs: number): boolean {
+  if (!audit?.lastChecked) return true;
+  return Date.now() - new Date(audit.lastChecked).getTime() > maxAgeMs;
+}
+
+export async function auditChannelNow(channelId: string): Promise<ChannelAudit> {
+  const audit = await auditChannel(channelId);
+  auditStore.set(channelId, audit);
+  return audit;
 }
 
 export async function startStreamAuditor(): Promise<void> {
@@ -144,17 +216,25 @@ export async function startStreamAuditor(): Promise<void> {
     return;
   }
 
-  void runFullAudit();
+  void runPriorityAudit();
 
-  auditTimer = setInterval(() => {
-    void runFullAudit();
-  }, env.streamAuditIntervalMs);
+  priorityTimer = setInterval(() => {
+    void runPriorityAudit();
+  }, env.streamAuditPriorityIntervalMs);
+
+  backgroundTimer = setInterval(() => {
+    void runBackgroundAuditSlice();
+  }, env.streamAuditBackgroundIntervalMs);
 }
 
 export function stopStreamAuditor(): void {
-  if (auditTimer) {
-    clearInterval(auditTimer);
-    auditTimer = null;
+  if (priorityTimer) {
+    clearInterval(priorityTimer);
+    priorityTimer = null;
+  }
+  if (backgroundTimer) {
+    clearInterval(backgroundTimer);
+    backgroundTimer = null;
   }
 }
 
@@ -164,9 +244,14 @@ export function getAuditorHealth() {
     enabled: env.streamAuditEnabled,
     running: auditRunning,
     total: auditStore.size,
+    live: audits.filter((a) => a.signal === 'live').length,
+    standby: audits.filter((a) => a.signal === 'standby').length,
+    offline: audits.filter((a) => a.signal === 'offline').length,
     ok: audits.filter((a) => a.status === 'ok').length,
     degraded: audits.filter((a) => a.status === 'degraded').length,
     unavailable: audits.filter((a) => a.status === 'unavailable').length,
-    intervalMs: env.streamAuditIntervalMs,
+    priorityIntervalMs: env.streamAuditPriorityIntervalMs,
+    backgroundIntervalMs: env.streamAuditBackgroundIntervalMs,
+    backgroundBatch: env.streamAuditBackgroundBatch,
   };
 }

@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getAgenda, getChannels, getStreamUrl } from './api/client';
+import { getAgenda, getChannels, getStreamUrl, probeChannel } from './api/client';
 import { AgendaPanel } from './components/AgendaPanel';
 import { ChannelGrid, type TabCategory } from './components/ChannelGrid';
 import { LiveNowStrip } from './components/LiveNowStrip';
 import { StadiumPlayer } from './components/StadiumPlayer';
 import { ChannelLogo } from './components/ChannelLogo';
 import type { AgendaEvent, Channel } from './types';
-import { getFeaturedChannels } from './utils/channels';
+import {
+  getFeaturedChannels,
+  isChannelLiveSignal,
+  isChannelOffline,
+  isChannelPendingAudit,
+  pickInitialChannel,
+} from './utils/channels';
 
 type BottomTab = 'canales' | 'agenda';
 
@@ -21,25 +27,54 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
 
   const featured = useMemo(() => getFeaturedChannels(channels, agenda), [channels, agenda]);
+  const liveCount = useMemo(
+    () => channels.filter(isChannelLiveSignal).length,
+    [channels],
+  );
   const initialChannelPicked = useRef(false);
   const playRequestRef = useRef(0);
 
+  const mergeChannelAudit = useCallback((channelId: string, audit: Channel['audit']) => {
+    if (!audit) return;
+    setChannels((prev) => prev.map((c) => (c.id === channelId ? { ...c, audit } : c)));
+    setActiveChannel((prev) => (prev?.id === channelId ? { ...prev, audit } : prev));
+  }, []);
+
   const playChannel = useCallback(async (channel: Channel) => {
-    if (channel.audit?.status === 'unavailable') return;
+    if (isChannelOffline(channel)) return;
 
     const requestId = ++playRequestRef.current;
     setActiveChannel(channel);
     setStreamUrl(null);
 
+    const auditAge = channel.audit?.lastChecked
+      ? Date.now() - new Date(channel.audit.lastChecked).getTime()
+      : Number.POSITIVE_INFINITY;
+    const shouldProbe =
+      isChannelPendingAudit(channel) || auditAge > 90_000;
+
     try {
-      const { proxyUrl } = await getStreamUrl(channel.id);
+      const [stream, probe] = await Promise.all([
+        getStreamUrl(channel.id),
+        shouldProbe ? probeChannel(channel.id).catch(() => null) : Promise.resolve(null),
+      ]);
+
       if (requestId !== playRequestRef.current) return;
-      setStreamUrl(proxyUrl);
+
+      if (probe?.audit) {
+        mergeChannelAudit(channel.id, probe.audit);
+        if (probe.audit.signal === 'offline' && probe.audit.status === 'unavailable') {
+          setStreamUrl(null);
+          return;
+        }
+      }
+
+      setStreamUrl(stream.proxyUrl);
     } catch {
       if (requestId !== playRequestRef.current) return;
       setStreamUrl(null);
     }
-  }, []);
+  }, [mergeChannelAudit]);
 
   const loadData = useCallback(() => {
     return Promise.all([getChannels(), getAgenda()])
@@ -60,10 +95,7 @@ export default function App() {
       .then(({ ch, ag }) => {
         if (initialChannelPicked.current) return;
 
-        const first =
-          getFeaturedChannels(ch, ag).find((c) => c.audit?.status !== 'unavailable') ??
-          ch.find((c) => c.audit?.status !== 'unavailable') ??
-          ch[0];
+        const first = pickInitialChannel(ch, ag);
 
         if (first) {
           initialChannelPicked.current = true;
@@ -84,7 +116,7 @@ export default function App() {
   useEffect(() => {
     const refresh = setInterval(() => {
       void loadData().catch(() => {});
-    }, 120_000);
+    }, 90_000);
     return () => clearInterval(refresh);
   }, [loadData]);
 
@@ -113,7 +145,7 @@ export default function App() {
     if (!activeChannel) return;
     const pool = featured.length > 0 ? featured : channels;
     const idx = pool.findIndex((c) => c.id === activeChannel.id);
-    const next = pool.slice(idx + 1).find((c) => c.audit?.status !== 'unavailable');
+    const next = pool.slice(idx + 1).find((c) => isChannelLiveSignal(c));
     if (next) void playChannel(next);
   }, [activeChannel, channels, featured, playChannel]);
 
@@ -174,6 +206,7 @@ export default function App() {
           <LiveNowStrip
             channels={featured}
             activeId={activeChannel?.id ?? null}
+            totalLive={liveCount}
             onSelect={(ch) => void playChannel(ch)}
           />
 

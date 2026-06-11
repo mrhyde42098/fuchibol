@@ -1,5 +1,5 @@
 import { API_BASE } from '../config';
-import type { AgendaEvent, Channel, StreamUrlResponse } from '../types';
+import type { AgendaEvent, Channel, ChannelProbeResponse, StreamUrlResponse } from '../types';
 
 async function fetchJson<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`);
@@ -20,4 +20,8 @@ export function getAgenda(): Promise<AgendaEvent[]> {
 
 export function getStreamUrl(channelId: string): Promise<StreamUrlResponse> {
   return fetchJson<StreamUrlResponse>(`/stream-url?id=${encodeURIComponent(channelId)}`);
+}
+
+export function probeChannel(channelId: string): Promise<ChannelProbeResponse> {
+  return fetchJson<ChannelProbeResponse>(`/channels/${encodeURIComponent(channelId)}/probe`);
 }

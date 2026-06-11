@@ -66,6 +66,9 @@ git push -u origin main
 PUBLIC_BASE_URL=https://fuchibol-api.onrender.com
 TOKEN_SECRET=un-secreto-largo-y-aleatorio-min-32-chars
 STREAM_AUDIT_ENABLED=true
+STREAM_AUDIT_PRIORITY_INTERVAL_MS=90000
+STREAM_AUDIT_BACKGROUND_INTERVAL_MS=45000
+STREAM_AUDIT_BACKGROUND_BATCH=6
 ```
 
 ### Frontend (Vercel/Netlify)
