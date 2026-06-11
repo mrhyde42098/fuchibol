@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+backend/.env
+frontend/.env
+*.log
+.DS_Store
+backend/test-*.json
+*.apk
+Golea-release.apk
+golea-analysis/apk-extracted/
+golea-analysis/live-main.js
