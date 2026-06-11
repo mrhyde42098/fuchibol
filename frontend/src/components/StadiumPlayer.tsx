@@ -23,6 +23,12 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
   const [qualityLabel, setQualityLabel] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const retryCountRef = useRef(0);
+  const onStreamFailedRef = useRef(onStreamFailed);
+  const loadGenerationRef = useRef(0);
+
+  useEffect(() => {
+    onStreamFailedRef.current = onStreamFailed;
+  }, [onStreamFailed]);
 
   const updateQuality = useCallback((hls: Hls) => {
     setQualityLabel(formatQualityLabel(hls));
@@ -40,6 +46,7 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
       const video = videoRef.current;
       if (!video) return;
 
+      const generation = ++loadGenerationRef.current;
       destroyHls();
       setLoading(true);
       setOffside(false);
@@ -57,6 +64,7 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
         hls.attachMedia(video);
 
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          if (generation !== loadGenerationRef.current) return;
           applyHighestLevel(hls);
           updateQuality(hls);
           setLoading(false);
@@ -80,9 +88,10 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
             return;
           }
 
+          if (generation !== loadGenerationRef.current) return;
           setLoading(false);
           setOffside(true);
-          onStreamFailed?.();
+          onStreamFailedRef.current?.();
         });
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
         video.src = url;
@@ -98,15 +107,16 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
         video.addEventListener(
           'error',
           () => {
+            if (generation !== loadGenerationRef.current) return;
             setLoading(false);
             setOffside(true);
-            onStreamFailed?.();
+            onStreamFailedRef.current?.();
           },
           { once: true },
         );
       }
     },
-    [destroyHls, onStreamFailed, updateQuality],
+    [destroyHls, updateQuality],
   );
 
   useEffect(() => {
@@ -181,7 +191,7 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
     <div
       ref={containerRef}
       className={`stadium-screen group relative w-full overflow-hidden rounded-2xl bg-[#03060f] shadow-[0_0_100px_rgba(0,0,0,0.75),inset_0_0_140px_rgba(0,102,255,0.05)] ring-1 ring-white/8 ${
-        isFullscreen ? 'h-screen max-h-screen rounded-none' : 'aspect-video min-h-[min(58vh,820px)] max-h-[82vh]'
+        isFullscreen ? 'h-screen max-h-screen rounded-none' : 'aspect-video min-h-[min(62vh,900px)] max-h-[78vh] w-full'
       }`}
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}

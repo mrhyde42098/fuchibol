@@ -58,6 +58,7 @@ const LOGO_BY_SLUG: Record<string, string> = {
   movistar: `${W}/4/4e/Movistar_logo_2022.svg/320px-Movistar_logo_2022.svg.png`,
   winsports: `${W}/8/8a/Win_Sports_logo.svg/320px-Win_Sports_logo.svg.png`,
   winsports2: `${W}/8/8a/Win_Sports_logo.svg/320px-Win_Sports_logo.svg.png`,
+  winsportsplus: `${W}/8/8a/Win_Sports_logo.svg/320px-Win_Sports_logo.svg.png`,
   tudn: `${W}/d/d3/TUDN_Logo.svg/320px-TUDN_Logo.svg.png`,
   tudn_mx: `${W}/d/d3/TUDN_Logo.svg/320px-TUDN_Logo.svg.png`,
   canal5: `${W}/5/5a/TV_Azteca_logo_%282017%29.svg/320px-TV_Azteca_logo_%282017%29.svg.png`,

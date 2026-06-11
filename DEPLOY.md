@@ -17,7 +17,7 @@ git init
 git add backend/ frontend/ golea-analysis/ render.yaml .gitignore
 git commit -m "Fuchibol: frontend + backend"
 git branch -M main
-git remote add origin https://github.com/TU_USUARIO/fuchibol.git
+git remote add origin https://github.com/mrhyde42098/fuchibol.git
 git push -u origin main
 ```
 

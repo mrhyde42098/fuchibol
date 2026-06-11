@@ -30,13 +30,23 @@ body {
   font-family: var(--font-display);
 }
 
-.scrollbar-none {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+.horizontal-track {
+  cursor: grab;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 102, 255, 0.45) transparent;
 }
 
-.scrollbar-none::-webkit-scrollbar {
-  display: none;
+.horizontal-track:active {
+  cursor: grabbing;
+}
+
+.horizontal-track::-webkit-scrollbar {
+  height: 6px;
+}
+
+.horizontal-track::-webkit-scrollbar-thumb {
+  background: rgba(0, 102, 255, 0.45);
+  border-radius: 999px;
 }
 
 ::-webkit-scrollbar {

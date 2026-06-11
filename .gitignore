@@ -16,6 +16,9 @@ golea-analysis/live-index.html
 golea-analysis/*.zip
 golea-analysis/*.apk
 golea-analysis/headers-*.txt
+golea-analysis/edge-*.txt
+golea-analysis/manifest-headers.txt
+golea-analysis/*.html
 golea-analysis/manifest*.m3u8
 golea-analysis/*.json
 !golea-analysis/channels.json

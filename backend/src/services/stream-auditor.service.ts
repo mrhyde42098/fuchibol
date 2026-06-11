@@ -98,13 +98,19 @@ async function runAuditBatch(channelIds: string[]): Promise<void> {
   }
 }
 
+function prioritizeAuditOrder(ids: string[]): string[] {
+  const winSports = ids.filter((id) => /win.?sport|winsport/i.test(id));
+  const rest = ids.filter((id) => !/win.?sport|winsport/i.test(id));
+  return [...winSports, ...rest];
+}
+
 async function runFullAudit(): Promise<void> {
   if (auditRunning) return;
   auditRunning = true;
 
   try {
     const { data: channels } = channelsCache.get();
-    const ids = channels.map((c) => c.id);
+    const ids = prioritizeAuditOrder(channels.map((c) => c.id));
     logger.info({ count: ids.length }, 'Stream audit started');
     await runAuditBatch(ids);
     logger.info({ audited: auditStore.size }, 'Stream audit completed');

@@ -3,8 +3,26 @@ import type { AgendaEvent, Channel } from '../types';
 const POPULAR_SLUGS = new Set([
   'espn', 'espn2', 'espn3', 'espnar', 'espndeportes', 'premium-v2-dsports',
   'premium-v2-foxsports', 'premium-v2-tycsports', 'premium-v2-tntsports',
+  'premium-v2-winsports', 'premium-v2-winsports2', 'tvtvhd-winsports2',
   'tycsports', 'dsportsar', 'disney1', 'foxsports', 'tvtvhd-espn',
 ]);
+
+export const CHANNEL_GROUPS = [
+  { id: 'premium', label: 'Premium HD', icon: '★' },
+  { id: 'win', label: 'Win Sports', icon: '⚽' },
+  { id: 'espn', label: 'ESPN', icon: '📺' },
+  { id: 'fox', label: 'Fox Sports', icon: '🦊' },
+  { id: 'streaming', label: 'Streaming', icon: '▶' },
+  { id: 'mexico', label: 'México', icon: '🇲🇽' },
+  { id: 'colombia', label: 'Colombia', icon: '🇨🇴' },
+  { id: 'argentina', label: 'Argentina', icon: '🇦🇷' },
+  { id: 'brasil', label: 'Brasil', icon: '🇧🇷' },
+  { id: 'usa', label: 'USA', icon: '🇺🇸' },
+  { id: 'otros', label: 'Más canales', icon: '···' },
+] as const;
+
+export type ChannelGroupId = (typeof CHANNEL_GROUPS)[number]['id'];
+export type TabCategory = 'Latam' | 'Internacional' | 'Canales';
 
 export function isLiveAgendaStatus(status: string): boolean {
   const s = status.toUpperCase();
@@ -26,6 +44,41 @@ export function isChannelOnline(ch: Channel): boolean {
   return ch.audit?.status === 'ok';
 }
 
+export function getChannelGroup(ch: Channel): ChannelGroupId {
+  const hay = `${ch.id} ${ch.name}`.toLowerCase();
+
+  if (/win\s*sport|winsport|winsports/.test(hay)) return 'win';
+  if (/espn/.test(hay)) return 'espn';
+  if (/fox\s*sport|foxdeportes|f2usa|fs1usa/.test(hay)) return 'fox';
+  if (/disney|vix|paramount|peacock|amazon|prime/.test(hay)) return 'streaming';
+  if (/tudn|azteca|canal\s*5|unimas|mex|_mx/.test(hay)) return 'mexico';
+  if (/caracol|rcn|win|liga\s*1|golperu/.test(hay) && !/win\s*sport/.test(hay)) return 'colombia';
+  if (/tyc|dsport|tnt\s*sport|telefe|movistar/.test(hay)) return 'argentina';
+  if (/sportv|premiere|caz[eé]tv|sporttv/.test(hay)) return 'brasil';
+  if (/usa|telemundo|univision|mlb|nba|nhl/.test(hay)) return 'usa';
+  if (/premium|tvtvhd/.test(hay)) return 'premium';
+  return 'otros';
+}
+
+export function groupChannelsBySections(channels: Channel[], tab: string): Map<ChannelGroupId, Channel[]> {
+  const filtered = channels.filter((ch) => {
+    if (tab === 'Canales') return !['Latam', 'Internacional'].includes(ch.category);
+    return ch.category === tab;
+  });
+
+  const sorted = [...filtered].sort((a, b) => channelQualityScore(b) - channelQualityScore(a));
+  const map = new Map<ChannelGroupId, Channel[]>();
+
+  for (const ch of sorted) {
+    const g = getChannelGroup(ch);
+    const list = map.get(g) ?? [];
+    list.push(ch);
+    map.set(g, list);
+  }
+
+  return map;
+}
+
 export function getLiveAgendaChannelIds(agenda: AgendaEvent[]): Set<string> {
   const ids = new Set<string>();
   for (const ev of agenda) {
@@ -45,6 +98,7 @@ export function getFeaturedChannels(channels: Channel[], agenda: AgendaEvent[]):
       let boost = channelQualityScore(ch);
       if (liveIds.has(ch.id)) boost += 50;
       if (POPULAR_SLUGS.has(ch.id)) boost += 15;
+      if (getChannelGroup(ch) === 'win') boost += 20;
       return { ch, boost };
     })
     .sort((a, b) => b.boost - a.boost);
@@ -59,7 +113,7 @@ export function getFeaturedChannels(channels: Channel[], agenda: AgendaEvent[]):
     seen.add(ch.id);
     seen.add(key);
     result.push(ch);
-    if (result.length >= 14) break;
+    if (result.length >= 32) break;
   }
 
   return result;
@@ -72,6 +126,14 @@ export function groupChannelsByCategory(channels: Channel[], tab: string): Chann
   });
 
   return [...filtered].sort((a, b) => channelQualityScore(b) - channelQualityScore(a));
+}
+
+export function filterChannelsByQuery(channels: Channel[], query: string): Channel[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return channels;
+  return channels.filter(
+    (ch) => ch.name.toLowerCase().includes(q) || ch.id.toLowerCase().includes(q),
+  );
 }
 
 export const SPORT_COLORS: Record<string, string> = {
