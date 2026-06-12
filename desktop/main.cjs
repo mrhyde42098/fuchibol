@@ -164,7 +164,7 @@ ipcMain.handle('get-logs', () => sm.getLogs(getProjectRoot()));
 ipcMain.handle('start-server', async () => {
   const root = getProjectRoot();
   try {
-    sm.ensureEnv(root);
+    sm.ensureEnv(sm.paths(root));
     if (sm.needsBuild(sm.paths(root))) {
       send('log', 'Primera vez: compilando proyecto...\n');
       await sm.runBuild(root, (t) => send('log', t));

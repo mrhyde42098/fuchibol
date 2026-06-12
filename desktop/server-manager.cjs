@@ -48,7 +48,8 @@ function randomSecret(len = 48) {
   return s;
 }
 
-function ensureEnv(p) {
+function ensureEnv(rootOrPaths) {
+  const p = typeof rootOrPaths === 'string' ? paths(rootOrPaths) : rootOrPaths;
   const err = getProjectError(p.root);
   if (err) throw new Error(err);
 
