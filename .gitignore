@@ -26,3 +26,9 @@ golea-analysis/*.json
 pkplay-analysis/extracted/
 pkplay-analysis/*.apk
 pkplay-analysis/*.zip
+logs/
+Fuchibol.exe
+release/
+desktop/node_modules/
+desktop/dist/
+tools/cloudflared.exe

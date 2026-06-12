@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fuchibol</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <img src="../icon.png" alt="" class="logo" onerror="this.style.display='none'" />
+    <div>
+      <h1>Fuchibol</h1>
+      <p class="subtitle">Servidor en tu PC</p>
+    </div>
+    <div id="status-pill" class="pill pill-off">Detenido</div>
+  </header>
+
+  <section class="actions">
+    <button id="btn-start" class="btn btn-primary">Iniciar</button>
+    <button id="btn-stop" class="btn btn-danger" disabled>Detener</button>
+    <button id="btn-repair" class="btn btn-secondary">Reparar</button>
+  </section>
+
+  <section class="urls" id="urls-panel">
+    <div class="url-row">
+      <span class="label">Este PC</span>
+      <code id="url-local">http://localhost:4000</code>
+      <button class="btn-icon" data-open="local" title="Abrir">↗</button>
+    </div>
+    <div class="url-row hidden" id="row-lan">
+      <span class="label">Celular WiFi</span>
+      <code id="url-lan">—</code>
+      <button class="btn-icon" data-open="lan" title="Abrir">↗</button>
+    </div>
+    <div class="url-row hidden" id="row-tunnel">
+      <span class="label">Internet</span>
+      <code id="url-tunnel">—</code>
+      <button class="btn-icon" data-open="tunnel" title="Abrir">↗</button>
+    </div>
+  </section>
+
+  <section class="tunnel">
+    <button id="btn-tunnel" class="btn btn-outline" disabled>Publicar en internet (túnel)</button>
+    <p class="hint">URL temporal gratis. Tu PC debe estar encendido.</p>
+  </section>
+
+  <section class="tools">
+    <button id="btn-rebuild" class="btn-link">Recompilar</button>
+    <button id="btn-logs-folder" class="btn-link">Carpeta logs</button>
+    <button id="btn-refresh-logs" class="btn-link">Actualizar logs</button>
+  </section>
+
+  <section class="logs-wrap">
+    <label>Registro / errores</label>
+    <pre id="logs" class="logs">Esperando...</pre>
+  </section>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="app.js"></script>
+</body>
+</html>

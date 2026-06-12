@@ -1,0 +1,43 @@
+{
+  "name": "fuchibol-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Panel de control Fuchibol para servidor en PC",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win portable",
+    "build:dir": "electron-builder --win dir"
+  },
+  "devDependencies": {
+    "electron": "^34.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.fuchibol.launcher",
+    "productName": "Fuchibol",
+    "directories": {
+      "output": "../release"
+    },
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "server-manager.cjs",
+      "ui/**/*",
+      "icon.png"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "signAndEditExecutable": false
+    },
+    "portable": {
+      "artifactName": "Fuchibol.exe"
+    }
+  }
+}

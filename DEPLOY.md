@@ -1,6 +1,19 @@
 # Desplegar Fuchibol gratis
 
-## Arquitectura
+## Mejor opción para internet (resumen)
+
+| Opción | Costo | PC encendido | URL fija | Recomendado si… |
+|--------|-------|--------------|----------|-----------------|
+| **A. Túnel Cloudflare** (botón en `Fuchibol.exe`) | Gratis | Sí | No (cambia) | Pruebas rápidas, compartir con amigos |
+| **B. Cloudflare Tunnel + cuenta** | Gratis | Sí | Sí (`fuchibol.tudominio.com`) | Quieres URL propia sin pagar hosting |
+| **C. Vercel + Render** | Gratis* | No | Sí | No quieres dejar el PC prendido (*Render plan Free, sin tarjeta) |
+| **D. Solo tu PC (LAN)** | Gratis | Sí | No | Solo tú y familia en casa |
+
+**Recomendación:** empieza con **`Fuchibol.exe` → Publicar en internet** para probar. Si te gusta y quieres URL fija, configura **Cloudflare Tunnel con dominio**. Si no quieres depender del PC, usa **Vercel (frontend) + Render (API)**.
+
+---
+
+## Arquitectura cloud (Vercel + Render)
 
 | Parte | Hosting gratis | URL ejemplo |
 |-------|----------------|-------------|
@@ -79,16 +92,51 @@ VITE_API_URL=https://fuchibol420-api.onrender.com/api
 
 ---
 
-## Servidor en tu PC (siempre encendido)
+## Servidor en tu PC (modo fácil — sin pagar hosting)
 
-Un solo proceso sirve la web y la API en el puerto **4000**:
+Tu PC sirve la web y la API en el puerto **4000**. Un doble clic y listo.
+
+### Opción A — Panel `Fuchibol.exe` (recomendado)
+
+Una sola vez:
+
+```powershell
+npm run build:exe
+```
+
+Queda **`Fuchibol.exe`** en la carpeta del proyecto. Doble clic abre un **panel con interfaz**:
+- Iniciar / Detener servidor
+- **Reparar** (reinstala deps, compila, arregla .env)
+- Ver logs y errores
+- Abrir web en PC, celular (WiFi) o internet (túnel)
+
+El `.exe` debe estar en la misma carpeta que `backend/` y `frontend/`.
+
+### Opción B — Scripts .bat (alternativa)
+
+| Archivo | Qué hace |
+|---------|----------|
+| **`Iniciar-Fuchibol.bat`** | Inicia servidor y abre navegador |
+| **`Detener-Fuchibol.bat`** | Apaga el servidor |
+
+### Acceso directo en el Escritorio
+
+```powershell
+npm run shortcut
+```
+
+### URLs
+
+- **Este PC:** `http://localhost:4000`
+- **Celular (misma WiFi):** `http://TU-IP-LOCAL:4000` (la consola te muestra la IP)
+- **Internet (modo túnel):** URL tipo `https://xxxx.trycloudflare.com` (cambia cada vez que inicias)
+
+### Terminal (avanzado)
 
 ```powershell
 cd D:\Users\DESKTOP\Desktop\Fuchibol
-.\scripts\start-home-server.ps1
+.\scripts\fuchibol-home.ps1 -Quick
 ```
-
-Abre **http://localhost:4000** (o `http://TU-IP-LOCAL:4000` desde el celular en la misma WiFi).
 
 ### Reinicio automático con PM2
 
