@@ -4,8 +4,8 @@
 
 | Parte | Hosting gratis | URL ejemplo |
 |-------|----------------|-------------|
-| **Frontend** (React) | [Vercel](https://vercel.com) o [Netlify](https://netlify.com) | `https://fuchibol.vercel.app` |
-| **Backend** (Fastify) | [Render](https://render.com) | `https://fuchibol-api.onrender.com` |
+| **Frontend** (React) | [Vercel](https://vercel.com) o [Netlify](https://netlify.com) | `https://fuchibol420.vercel.app` |
+| **Backend** (Fastify) | [Render](https://render.com) | `https://fuchibol420-api.onrender.com` |
 
 ---
 
@@ -29,7 +29,7 @@ git push -u origin main
 2. Conecta tu repo de GitHub
 3. Render detectará `render.yaml` automáticamente
 4. En variables de entorno, configura:
-   - `PUBLIC_BASE_URL` = `https://fuchibol-api.onrender.com` (tu URL de Render)
+   - `PUBLIC_BASE_URL` = `https://fuchibol420-api.onrender.com` (tu URL de Render)
 5. Deploy → espera ~3 min
 6. Prueba: `https://TU-API.onrender.com/api/health`
 
@@ -42,11 +42,12 @@ git push -u origin main
 1. Entra a [vercel.com](https://vercel.com) → **Add New Project**
 2. Importa el mismo repo de GitHub
 3. **Root Directory**: `frontend`
-4. **Environment Variables**:
+4. **Project Name**: `fuchibol420` (quedará en `https://fuchibol420.vercel.app`)
+5. **Environment Variables**:
    ```
-   VITE_API_URL=https://TU-API.onrender.com/api
+   VITE_API_URL=https://fuchibol420-api.onrender.com/api
    ```
-5. Deploy → listo en ~1 min
+6. Deploy → listo en ~1 min
 
 ---
 
@@ -63,7 +64,7 @@ git push -u origin main
 
 ### Backend (`backend/.env` en Render)
 ```
-PUBLIC_BASE_URL=https://fuchibol-api.onrender.com
+PUBLIC_BASE_URL=https://fuchibol420-api.onrender.com
 TOKEN_SECRET=un-secreto-largo-y-aleatorio-min-32-chars
 STREAM_AUDIT_ENABLED=true
 STREAM_AUDIT_PRIORITY_INTERVAL_MS=90000
@@ -73,7 +74,7 @@ STREAM_AUDIT_BACKGROUND_BATCH=6
 
 ### Frontend (Vercel/Netlify)
 ```
-VITE_API_URL=https://fuchibol-api.onrender.com/api
+VITE_API_URL=https://fuchibol420-api.onrender.com/api
 ```
 
 ---
