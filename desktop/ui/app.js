@@ -11,17 +11,22 @@ function toast(msg, isError = false) {
 }
 
 function setBusy(busy) {
-  $('btn-start').disabled = busy || state.running;
+  const ok = state.projectValid !== false;
+  $('btn-start').disabled = busy || state.running || !ok;
   $('btn-stop').disabled = busy || !state.running;
-  $('btn-repair').disabled = busy;
-  $('btn-rebuild').disabled = busy;
-  $('btn-tunnel').disabled = busy || !state.running;
+  $('btn-repair').disabled = busy || !ok;
+  $('btn-rebuild').disabled = busy || !ok;
+  $('btn-tunnel').disabled = busy || !state.running || !ok;
 }
 
 function applyStatus(s) {
   state = s;
   const pill = $('status-pill');
-  if (!s.nodeOk) {
+  if (!s.projectValid) {
+    pill.textContent = 'Sin proyecto';
+    pill.className = 'pill pill-warn';
+    if (s.projectError) $('logs').textContent = s.projectError;
+  } else if (!s.nodeOk) {
     pill.textContent = 'Sin Node.js';
     pill.className = 'pill pill-warn';
   } else if (s.running) {

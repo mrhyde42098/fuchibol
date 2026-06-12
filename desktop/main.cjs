@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage } = require(
 const path = require('path');
 const fs = require('fs');
 const sm = require('./server-manager.cjs');
+const { resolveProjectRoot } = require('./project-root.cjs');
 
 const PORT = 4000;
 let mainWindow = null;
@@ -9,8 +10,7 @@ let tray = null;
 let pollTimer = null;
 
 function getProjectRoot() {
-  if (app.isPackaged) return path.dirname(process.execPath);
-  return path.resolve(__dirname, '..');
+  return resolveProjectRoot(app.isPackaged, path.resolve(__dirname, '..'));
 }
 
 function send(channel, data) {

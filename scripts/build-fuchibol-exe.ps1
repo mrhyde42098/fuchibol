@@ -28,13 +28,20 @@ if ($LASTEXITCODE -ne 0) { exit 1 }
 
 $exe = Join-Path $Root 'release\Fuchibol.exe'
 if (Test-Path $exe) {
-  Copy-Item $exe (Join-Path $Root 'Fuchibol.exe') -Force
+  $dest = Join-Path $Root 'Fuchibol.exe'
+  try {
+    Copy-Item $exe $dest -Force
+  } catch {
+    $dest = Join-Path $Root 'Fuchibol-nuevo.exe'
+    Copy-Item $exe $dest -Force
+    Write-Host 'Fuchibol.exe estaba abierto — guardado como Fuchibol-nuevo.exe' -ForegroundColor Yellow
+  }
   Write-Host ''
   Write-Host 'Listo:' -ForegroundColor Green
   Write-Host "  $exe" -ForegroundColor Green
-  Write-Host "  $(Join-Path $Root 'Fuchibol.exe')" -ForegroundColor Green
+  Write-Host "  $dest" -ForegroundColor Green
   Write-Host ''
-  Write-Host 'Coloca Fuchibol.exe en la carpeta del proyecto y abrelo.' -ForegroundColor Yellow
+  Write-Host 'Abre el .exe desde la carpeta que tiene backend/ y frontend/.' -ForegroundColor Yellow
 } else {
   Write-Host 'No se encontro release\Fuchibol.exe' -ForegroundColor Red
   exit 1

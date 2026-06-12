@@ -23,6 +23,8 @@
       "main.cjs",
       "preload.cjs",
       "server-manager.cjs",
+      "project-root.cjs",
+      "default.env.example",
       "ui/**/*",
       "icon.png"
     ],

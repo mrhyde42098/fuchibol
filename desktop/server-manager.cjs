@@ -3,10 +3,9 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const os = require('os');
+const { isProjectRoot, getProjectError } = require('./project-root.cjs');
 
-function getRoot(exeDir) {
-  return exeDir;
-}
+const BUNDLED_ENV = path.join(__dirname, 'default.env.example');
 
 function paths(root) {
   return {
@@ -50,9 +49,13 @@ function randomSecret(len = 48) {
 }
 
 function ensureEnv(p) {
+  const err = getProjectError(p.root);
+  if (err) throw new Error(err);
+
   if (!fs.existsSync(p.envFile)) {
     if (fs.existsSync(p.envExample)) fs.copyFileSync(p.envExample, p.envFile);
-    else throw new Error('Falta backend/.env.example');
+    else if (fs.existsSync(BUNDLED_ENV)) fs.copyFileSync(BUNDLED_ENV, p.envFile);
+    else throw new Error('No se pudo crear backend/.env');
   }
   let text = fs.readFileSync(p.envFile, 'utf8');
   const set = (key, value) => {
@@ -286,6 +289,8 @@ function startTunnel(root) {
 
 function getStatus(root) {
   const p = paths(root);
+  const projectValid = isProjectRoot(root);
+  const projectError = getProjectError(root);
   const pid = readPid(p);
   const running = pid ? isProcessAlive(pid) : false;
   const lan = getLanIp();
@@ -296,7 +301,10 @@ function getStatus(root) {
   return {
     running,
     pid: running ? pid : null,
-    needsBuild: needsBuild(p),
+    projectValid,
+    projectError,
+    projectRoot: root,
+    needsBuild: projectValid && needsBuild(p),
     localUrl,
     lanUrl,
     tunnelUrl: tunnel,
@@ -327,7 +335,6 @@ async function repair(root, onLine) {
 }
 
 module.exports = {
-  getRoot,
   paths,
   ensureEnv,
   needsBuild,
