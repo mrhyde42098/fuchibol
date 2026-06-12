@@ -8,9 +8,22 @@ const PORT = 4000;
 let mainWindow = null;
 let tray = null;
 let pollTimer = null;
+let isQuitting = false;
+let lastStatus = {};
 
 function getProjectRoot() {
   return resolveProjectRoot(app.isPackaged, path.resolve(__dirname, '..'));
+}
+
+function getTrayIcon() {
+  const iconPath = path.join(__dirname, 'icon.png');
+  if (fs.existsSync(iconPath)) {
+    const img = nativeImage.createFromPath(iconPath);
+    if (!img.isEmpty()) return img.resize({ width: 16, height: 16 });
+  }
+  return nativeImage.createFromDataURL(
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAMElEQVQ4T2NkYGD4z0ABYBzVMKoBBg2MwwwM/5nQaBiGUTUAAJxFBAv0n8x8AAAAAElFTkSuQmCC',
+  );
 }
 
 function send(channel, data) {
@@ -19,9 +32,63 @@ function send(channel, data) {
   }
 }
 
+function updateTray(status) {
+  if (!tray) return;
+  lastStatus = status;
+  const line = status.running ? 'Servidor en línea' : 'Servidor detenido';
+  tray.setToolTip(`Fuchibol — ${line}`);
+}
+
+function hideToTray(notify = true) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.hide();
+  if (notify && tray && process.platform === 'win32') {
+    try {
+      tray.displayBalloon({
+        title: 'Fuchibol',
+        content: 'Sigue en segundo plano. Clic derecho en el icono de la bandeja para abrir.',
+      });
+    } catch { /* ignore */ }
+  }
+}
+
+function showWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) createWindow();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function buildTrayMenu() {
+  const running = lastStatus.running;
+  return Menu.buildFromTemplate([
+    { label: 'Abrir panel', click: () => showWindow() },
+    { label: 'Abrir web', click: () => shell.openExternal('http://localhost:4000'), enabled: running },
+    { type: 'separator' },
+    {
+      label: 'Detener servidor',
+      enabled: running,
+      click: () => {
+        sm.stopServer(getProjectRoot());
+        broadcastStatus();
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'Salir de Fuchibol',
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      },
+    },
+  ]);
+}
+
 function broadcastStatus() {
   const root = getProjectRoot();
-  send('status', sm.getStatus(root));
+  const status = sm.getStatus(root);
+  updateTray(status);
+  if (tray) tray.setContextMenu(buildTrayMenu());
+  send('status', status);
 }
 
 function startPolling() {
@@ -32,9 +99,9 @@ function startPolling() {
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 520,
-    height: 640,
+    height: 660,
     minWidth: 440,
-    minHeight: 520,
+    minHeight: 540,
     title: 'Fuchibol',
     backgroundColor: '#0a1128',
     autoHideMenuBar: true,
@@ -46,22 +113,27 @@ function createWindow() {
     },
   });
   mainWindow.loadFile(path.join(__dirname, 'ui', 'index.html'));
-  mainWindow.on('closed', () => { mainWindow = null; });
+
+  mainWindow.on('minimize', () => hideToTray(false));
+
+  mainWindow.on('close', (e) => {
+    if (!isQuitting) {
+      e.preventDefault();
+      hideToTray(true);
+    }
+  });
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
 }
 
 function createTray() {
-  const iconPath = path.join(__dirname, 'icon.png');
-  const icon = fs.existsSync(iconPath) ? nativeImage.createFromPath(iconPath) : nativeImage.createEmpty();
-  tray = new Tray(icon.isEmpty() ? nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==') : icon);
+  tray = new Tray(getTrayIcon());
   tray.setToolTip('Fuchibol');
-  const menu = Menu.buildFromTemplate([
-    { label: 'Abrir panel', click: () => { mainWindow?.show(); } },
-    { label: 'Abrir web', click: () => shell.openExternal('http://localhost:4000') },
-    { type: 'separator' },
-    { label: 'Salir', click: () => app.quit() },
-  ]);
-  tray.setContextMenu(menu);
-  tray.on('double-click', () => mainWindow?.show());
+  tray.setContextMenu(buildTrayMenu());
+  tray.on('click', () => showWindow());
+  tray.on('double-click', () => showWindow());
 }
 
 app.whenReady().then(() => {
@@ -73,11 +145,16 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', (e) => {
   e.preventDefault();
-  mainWindow?.hide();
+  hideToTray(false);
 });
 
 app.on('before-quit', () => {
+  isQuitting = true;
   if (pollTimer) clearInterval(pollTimer);
+});
+
+ipcMain.handle('minimize-to-tray', () => {
+  hideToTray(true);
 });
 
 ipcMain.handle('get-status', () => sm.getStatus(getProjectRoot()));

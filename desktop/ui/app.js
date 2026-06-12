@@ -108,6 +108,7 @@ $('btn-tunnel').onclick = async () => {
   await refreshLogs();
 };
 
+$('btn-tray').onclick = () => window.fuchibol.minimizeToTray();
 $('btn-logs-folder').onclick = () => window.fuchibol.openFolder('logs');
 $('btn-refresh-logs').onclick = refreshLogs;
 

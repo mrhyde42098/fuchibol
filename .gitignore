@@ -28,6 +28,7 @@ pkplay-analysis/*.apk
 pkplay-analysis/*.zip
 logs/
 Fuchibol.exe
+Fuchibol-nuevo.exe
 release/
 desktop/node_modules/
 desktop/dist/
