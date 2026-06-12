@@ -5,6 +5,7 @@ import { env } from '../config/env.js';
 import { MemoryCache } from '../cache/memory-cache.js';
 import { scrapeLa18hdChannels } from '../scrapers/la18hd.scraper.js';
 import { loadEnrichedAgenda } from './agenda.service.js';
+import { scrapeFutbolLibreChannels } from '../scrapers/futbol-libre.scraper.js';
 import { scrapePelotaLibreChannels } from '../scrapers/pelota-libre.scraper.js';
 import { scrapeTvtvhdChannels } from '../scrapers/tvtvhd.scraper.js';
 import type { AgendaEvent } from '../types/agenda.js';
@@ -52,7 +53,16 @@ async function loadFallbackChannels(): Promise<RawChannel[]> {
 function mergeChannelsInto(target: Map<string, PublicChannel>, rawList: RawChannel[]): void {
   for (const ch of rawList) {
     const normalized = normalizeChannel(ch);
-    target.set(normalized.id, normalized);
+    const existing = target.get(normalized.id);
+    if (!existing) {
+      target.set(normalized.id, normalized);
+      continue;
+    }
+    const backups = new Set([...(existing.backups ?? []), ...(normalized.backups ?? [])]);
+    target.set(normalized.id, {
+      ...existing,
+      backups: backups.size > 0 ? [...backups] : undefined,
+    });
   }
 }
 
@@ -71,6 +81,7 @@ async function loadChannels(): Promise<PublicChannel[]> {
     scrapePelotaLibreChannels(),
     scrapeLa18hdChannels(),
     scrapeTvtvhdChannels(),
+    env.futbolLibreEnabled ? scrapeFutbolLibreChannels() : Promise.resolve([]),
   ]);
 
   for (const result of results) {

@@ -1,6 +1,6 @@
 import { profileForUrl } from '../config/upstream-profiles.js';
 import { logger } from '../utils/logger.js';
-import { fetchUpstream } from './upstream-client.js';
+import { fetchUpstream, type FetchProfileOverrides } from './upstream-client.js';
 
 interface Variant {
   url: string;
@@ -42,12 +42,19 @@ function bestVariant(variants: Variant[]): Variant {
 /**
  * Sigue master playlists anidados y devuelve el manifiesto de mayor resolución/bitrate.
  */
-export async function pickHighestQualityManifest(manifestUrl: string, depth = 0): Promise<string> {
+export async function pickHighestQualityManifest(
+  manifestUrl: string,
+  depth = 0,
+  profileOverrides?: FetchProfileOverrides,
+): Promise<string> {
   if (depth > 4) return manifestUrl;
 
   try {
     const { key } = profileForUrl(manifestUrl);
-    const upstream = await fetchUpstream(manifestUrl, key, { timeoutMs: 12_000 });
+    const upstream = await fetchUpstream(manifestUrl, key, {
+      timeoutMs: 12_000,
+      profileOverrides,
+    });
     const text = typeof upstream.body === 'string' ? upstream.body : upstream.body.toString('utf8');
 
     if (!text.includes('#EXT-X-STREAM-INF')) return manifestUrl;
@@ -61,7 +68,7 @@ export async function pickHighestQualityManifest(manifestUrl: string, depth = 0)
       'Selected HD variant'
     );
 
-    return pickHighestQualityManifest(chosen.url, depth + 1);
+    return pickHighestQualityManifest(chosen.url, depth + 1, profileOverrides);
   } catch (err) {
     logger.debug({ err, manifestUrl }, 'HD variant selection failed, using original');
     return manifestUrl;

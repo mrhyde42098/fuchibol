@@ -7,10 +7,11 @@ export async function proxyManifest(token: string): Promise<{ body: string; cont
   const payload = verifyToken(token, 'manifest');
   const upstream = await fetchUpstream(payload.url, payload.profile as ProfileKey, {
     timeoutMs: 15_000,
+    profileOverrides: payload.headers,
   });
 
   const text = typeof upstream.body === 'string' ? upstream.body : upstream.body.toString('utf8');
-  const rewritten = rewriteM3u8(text, payload.url);
+  const rewritten = rewriteM3u8(text, payload.url, payload.headers);
 
   return {
     body: rewritten,
@@ -23,6 +24,7 @@ export async function proxySegment(token: string): Promise<{ body: Buffer; conte
   const upstream = await fetchUpstream(payload.url, payload.profile as ProfileKey, {
     binary: true,
     timeoutMs: 30_000,
+    profileOverrides: payload.headers,
   });
 
   const buffer = Buffer.isBuffer(upstream.body) ? upstream.body : Buffer.from(upstream.body as string);

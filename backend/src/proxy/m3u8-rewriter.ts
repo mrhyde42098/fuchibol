@@ -1,6 +1,5 @@
-import type { ProfileKey } from '../config/upstream-profiles.js';
 import { profileForUrl } from '../config/upstream-profiles.js';
-import { buildProxyUrl } from '../services/token.service.js';
+import { buildProxyUrl, type TokenHeaderOverrides } from '../services/token.service.js';
 
 const PLAYLIST_EXTENSIONS = /\.(m3u8|m3u)(\?|$)/i;
 const SEGMENT_EXTENSIONS = /\.(ts|m4s|aac|mp4|vtt)(\?|$)/i;
@@ -22,17 +21,25 @@ function resolveUrl(relativeOrAbsolute: string, baseUrl: string): string {
   }
 }
 
-function proxyUrlForUpstream(upstreamUrl: string, baseUrl: string): string {
+function proxyUrlForUpstream(
+  upstreamUrl: string,
+  baseUrl: string,
+  headers?: TokenHeaderOverrides,
+): string {
   const absolute = resolveUrl(upstreamUrl, baseUrl);
   const { key } = profileForUrl(absolute);
   const type = isPlaylistUrl(absolute) && !isSegmentUrl(absolute) ? 'manifest' : 'segment';
   if (isPlaylistUrl(absolute)) {
-    return buildProxyUrl('manifest', absolute, key);
+    return buildProxyUrl('manifest', absolute, key, headers);
   }
-  return buildProxyUrl(type, absolute, key);
+  return buildProxyUrl(type, absolute, key, headers);
 }
 
-export function rewriteM3u8(content: string, baseUpstreamUrl: string): string {
+export function rewriteM3u8(
+  content: string,
+  baseUpstreamUrl: string,
+  headers?: TokenHeaderOverrides,
+): string {
   const lines = content.split(/\r?\n/);
   const output: string[] = [];
 
@@ -48,7 +55,7 @@ export function rewriteM3u8(content: string, baseUpstreamUrl: string): string {
     if (trimmed.startsWith('#')) {
       const uriMatch = trimmed.match(/URI="([^"]+)"/i);
       if (uriMatch?.[1]) {
-        const proxied = proxyUrlForUpstream(uriMatch[1], baseUpstreamUrl);
+        const proxied = proxyUrlForUpstream(uriMatch[1], baseUpstreamUrl, headers);
         output.push(trimmed.replace(uriMatch[1], proxied));
         continue;
       }
@@ -57,7 +64,7 @@ export function rewriteM3u8(content: string, baseUpstreamUrl: string): string {
     }
 
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || !trimmed.startsWith('#')) {
-      const proxied = proxyUrlForUpstream(trimmed, baseUpstreamUrl);
+      const proxied = proxyUrlForUpstream(trimmed, baseUpstreamUrl, headers);
       output.push(proxied);
       continue;
     }

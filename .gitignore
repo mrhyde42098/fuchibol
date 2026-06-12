@@ -23,3 +23,6 @@ golea-analysis/manifest*.m3u8
 golea-analysis/*.json
 !golea-analysis/channels.json
 !golea-analysis/agenda.json
+pkplay-analysis/extracted/
+pkplay-analysis/*.apk
+pkplay-analysis/*.zip

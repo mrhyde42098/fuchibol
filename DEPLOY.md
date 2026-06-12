@@ -78,6 +78,31 @@ VITE_API_URL=https://fuchibol-api.onrender.com/api
 
 ---
 
+## Servidor en tu PC (siempre encendido)
+
+Un solo proceso sirve la web y la API en el puerto **4000**:
+
+```powershell
+cd D:\Users\DESKTOP\Desktop\Fuchibol
+.\scripts\start-home-server.ps1
+```
+
+Abre **http://localhost:4000** (o `http://TU-IP-LOCAL:4000` desde el celular en la misma WiFi).
+
+### Reinicio automático con PM2
+
+```bash
+npm run build
+npm i -g pm2
+pm2 start ecosystem.config.cjs
+pm2 save
+pm2 startup   # arranca al encender Windows (sigue instrucciones de PM2)
+```
+
+El backend actualiza solo cada **60 s** la agenda/canales, cada **90 s** audita señales prioritarias, y renueva espejos IPTV cada **6 h**.
+
+---
+
 ## Probar local antes de subir
 
 ```bash
@@ -89,3 +114,32 @@ cd frontend && npm run dev
 ```
 
 Abre http://localhost:5173
+
+---
+
+## UI lista para producción (checklist)
+
+Antes de publicar, verifica en **http://localhost:4000** (servidor único) o en la URL de Vercel:
+
+- [ ] Logo **Fuchibol** visible en el header (`/brand/fuchibol-logo.svg`)
+- [ ] Favicon carga (`/brand/fuchibol-mark.svg`)
+- [ ] Canales Latam muestran **logo de marca** (ESPN, Win, TyC, Fox…) no solo iniciales
+- [ ] Guía de canales: máximo **2 filas** de filtros (región + señal; avanzados en "Filtros")
+- [ ] Secciones colapsables (Win Sports, ESPN, etc.) con acordeón
+- [ ] Carrusel "En el aire" con logos grandes
+- [ ] Agenda con botones de canal con logo y calidad (1080p/720p)
+- [ ] Reproductor y fondo `#0a1128` sin cambios de tamaño
+- [ ] `npm run build` en `frontend/` sin errores
+- [ ] Meta OG para compartir link (`/brand/og-image.svg`)
+
+### Build y servir en un solo puerto
+
+```bash
+cd frontend && npm run build
+cd ../backend
+set SERVE_FRONTEND=true
+set PUBLIC_BASE_URL=http://localhost:4000
+npm start
+```
+
+Assets estáticos de marca y logos tienen cache de 7 días en Vercel (`frontend/vercel.json`).

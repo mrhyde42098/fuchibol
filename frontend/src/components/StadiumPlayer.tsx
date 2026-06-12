@@ -6,39 +6,94 @@ import { applyHighestLevel, createHlsInstance, formatQualityLabel } from '../uti
 
 interface StadiumPlayerProps {
   src: string | null;
+  channelId: string | null;
   channelName: string;
   onStreamFailed?: () => void;
 }
 
-export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlayerProps) {
+function isFullscreenActive(): boolean {
+  return Boolean(
+    document.fullscreenElement ||
+      (document as Document & { webkitFullscreenElement?: Element }).webkitFullscreenElement,
+  );
+}
+
+export function StadiumPlayer({ src, channelId, channelName, onStreamFailed }: StadiumPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [loading, setLoading] = useState(false);
   const [offside, setOffside] = useState(false);
-  const [hovering, setHovering] = useState(false);
+  const [unsupported, setUnsupported] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(false);
   const [muted, setMuted] = useState(true);
   const [playing, setPlaying] = useState(false);
   const [volume, setVolume] = useState(0.7);
   const [qualityLabel, setQualityLabel] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const retryCountRef = useRef(0);
+  const mediaRetryRef = useRef(0);
   const onStreamFailedRef = useRef(onStreamFailed);
   const loadGenerationRef = useRef(0);
+  const controlsHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevChannelIdRef = useRef<string | null>(null);
+  /** Tras el primer gesto del usuario, mantener sonido en recargas y refrescos de token */
+  const userWantsSoundRef = useRef(false);
+  const volumeRef = useRef(0.7);
+
+  const applyAudioPrefs = useCallback((video: HTMLVideoElement) => {
+    video.volume = volumeRef.current;
+    if (userWantsSoundRef.current) {
+      video.muted = false;
+      setMuted(false);
+    } else {
+      video.muted = true;
+      setMuted(true);
+    }
+  }, []);
+
+  const rememberAudioPrefs = useCallback((video: HTMLVideoElement) => {
+    volumeRef.current = video.volume;
+    userWantsSoundRef.current = !video.muted && video.volume > 0;
+    setVolume(video.volume);
+    setMuted(video.muted);
+  }, []);
 
   useEffect(() => {
     onStreamFailedRef.current = onStreamFailed;
   }, [onStreamFailed]);
+
+  const clearRetryTimeout = useCallback(() => {
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
+  }, []);
 
   const updateQuality = useCallback((hls: Hls) => {
     setQualityLabel(formatQualityLabel(hls));
   }, []);
 
   const destroyHls = useCallback(() => {
+    clearRetryTimeout();
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
     }
+    const video = videoRef.current;
+    if (video) {
+      video.removeAttribute('src');
+      video.load();
+    }
+  }, [clearRetryTimeout]);
+
+  const showControlsBriefly = useCallback(() => {
+    setControlsVisible(true);
+    if (controlsHideTimerRef.current) clearTimeout(controlsHideTimerRef.current);
+    controlsHideTimerRef.current = setTimeout(() => {
+      if (!isFullscreenActive()) setControlsVisible(false);
+    }, 4500);
   }, []);
 
   const loadStream = useCallback(
@@ -50,11 +105,12 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
       destroyHls();
       setLoading(true);
       setOffside(false);
+      setUnsupported(false);
       setQualityLabel(null);
       retryCountRef.current = 0;
+      mediaRetryRef.current = 0;
 
-      video.muted = true;
-      setMuted(true);
+      applyAudioPrefs(video);
 
       if (Hls.isSupported()) {
         const hls = createHlsInstance(Hls);
@@ -69,6 +125,7 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
           updateQuality(hls);
           setLoading(false);
           video.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+          showControlsBriefly();
         });
 
         hls.on(Hls.Events.LEVEL_SWITCHED, () => updateQuality(hls));
@@ -76,14 +133,20 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
         hls.on(Hls.Events.ERROR, (_event, data) => {
           if (!data.fatal) return;
 
-          if (data.type === Hls.ErrorTypes.NETWORK_ERROR && retryCountRef.current < 3) {
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR && retryCountRef.current < 4) {
             retryCountRef.current += 1;
             setOffside(true);
-            setTimeout(() => hls.startLoad(), 1500);
+            clearRetryTimeout();
+            retryTimeoutRef.current = setTimeout(() => {
+              if (generation !== loadGenerationRef.current) return;
+              hls.startLoad();
+              setOffside(false);
+            }, 1500 * retryCountRef.current);
             return;
           }
 
-          if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+          if (data.type === Hls.ErrorTypes.MEDIA_ERROR && mediaRetryRef.current < 3) {
+            mediaRetryRef.current += 1;
             hls.recoverMediaError();
             return;
           }
@@ -98,9 +161,11 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
         video.addEventListener(
           'loadedmetadata',
           () => {
+            if (generation !== loadGenerationRef.current) return;
             setLoading(false);
             setQualityLabel('Auto');
             video.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+            showControlsBriefly();
           },
           { once: true },
         );
@@ -114,27 +179,65 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
           },
           { once: true },
         );
+      } else {
+        setLoading(false);
+        setUnsupported(true);
       }
     },
-    [destroyHls, updateQuality],
+    [applyAudioPrefs, clearRetryTimeout, destroyHls, showControlsBriefly, updateQuality],
+  );
+
+  const softRefreshStream = useCallback(
+    (url: string) => {
+      const hls = hlsRef.current;
+      const video = videoRef.current;
+      if (!hls || !video) return false;
+
+      hls.loadSource(url);
+      hls.startLoad();
+      applyAudioPrefs(video);
+      void video.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+      return true;
+    },
+    [applyAudioPrefs],
   );
 
   useEffect(() => {
     if (!src) {
       destroyHls();
+      prevChannelIdRef.current = null;
       setLoading(false);
       setOffside(false);
+      setUnsupported(false);
       setQualityLabel(null);
       return;
     }
+
+    const channelChanged = channelId !== prevChannelIdRef.current;
+
+    if (!channelChanged && hlsRef.current && softRefreshStream(src)) {
+      return;
+    }
+
+    if (channelChanged) {
+      destroyHls();
+    }
+
+    prevChannelIdRef.current = channelId;
     loadStream(src);
-    return destroyHls;
-  }, [src, loadStream, destroyHls]);
+  }, [src, channelId, loadStream, destroyHls, softRefreshStream]);
+
+  useEffect(() => () => destroyHls(), [destroyHls]);
 
   useEffect(() => {
-    const onFs = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    const onFs = () => setIsFullscreen(isFullscreenActive());
     document.addEventListener('fullscreenchange', onFs);
-    return () => document.removeEventListener('fullscreenchange', onFs);
+    document.addEventListener('webkitfullscreenchange', onFs);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFs);
+      document.removeEventListener('webkitfullscreenchange', onFs);
+      if (controlsHideTimerRef.current) clearTimeout(controlsHideTimerRef.current);
+    };
   }, []);
 
   const togglePlay = () => {
@@ -152,27 +255,30 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
     const video = videoRef.current;
     if (!video) return;
     video.muted = !video.muted;
-    setMuted(video.muted);
+    rememberAudioPrefs(video);
   };
 
   const handleVolume = (v: number) => {
     const video = videoRef.current;
     if (!video) return;
     video.volume = v;
-    setVolume(v);
     if (v > 0 && video.muted) {
       video.muted = false;
-      setMuted(false);
     }
+    rememberAudioPrefs(video);
   };
 
   const toggleFullscreen = () => {
     const el = containerRef.current;
     if (!el) return;
-    if (document.fullscreenElement) {
-      void document.exitFullscreen();
+    if (isFullscreenActive()) {
+      const doc = document as Document & { webkitExitFullscreen?: () => Promise<void> };
+      if (doc.webkitExitFullscreen) void doc.webkitExitFullscreen();
+      else void document.exitFullscreen();
     } else {
-      void el.requestFullscreen();
+      const htmlEl = el as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> };
+      if (htmlEl.webkitRequestFullscreen) void htmlEl.webkitRequestFullscreen();
+      else void el.requestFullscreen();
     }
   };
 
@@ -187,14 +293,19 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
     if (src) loadStream(src);
   };
 
+  const controlsShown = controlsVisible || isFullscreen || muted;
+
   return (
     <div
       ref={containerRef}
       className={`stadium-screen group relative w-full overflow-hidden rounded-2xl bg-[#03060f] shadow-[0_0_100px_rgba(0,0,0,0.75),inset_0_0_140px_rgba(0,102,255,0.05)] ring-1 ring-white/8 ${
-        isFullscreen ? 'h-screen max-h-screen rounded-none' : 'aspect-video min-h-[min(62vh,900px)] max-h-[78vh] w-full'
+        isFullscreen ? 'h-screen max-h-screen rounded-none' : 'aspect-video min-h-[min(50vh,720px)] max-h-[78vh] w-full'
       }`}
-      onMouseEnter={() => setHovering(true)}
-      onMouseLeave={() => setHovering(false)}
+      onMouseEnter={() => setControlsVisible(true)}
+      onMouseLeave={() => {
+        if (!isFullscreen) setControlsVisible(false);
+      }}
+      onClick={() => showControlsBriefly()}
     >
       <div className="pointer-events-none absolute inset-0 z-[1] bg-[radial-gradient(ellipse_at_center,transparent_50%,rgba(0,0,0,0.55)_100%)]" />
 
@@ -202,8 +313,8 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
         ref={videoRef}
         className="stadium-video relative z-0 h-full w-full object-contain"
         playsInline
-        muted
         autoPlay
+        aria-label={`Reproductor: ${channelName}`}
       />
 
       {qualityLabel && !loading && (
@@ -219,24 +330,51 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
         </div>
       )}
 
+      {muted && !loading && !unsupported && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            const video = videoRef.current;
+            if (video) {
+              video.muted = false;
+              rememberAudioPrefs(video);
+            }
+          }}
+          className="absolute left-1/2 top-4 z-20 -translate-x-1/2 rounded-full bg-black/60 px-4 py-1.5 text-xs font-semibold text-white backdrop-blur-md ring-1 ring-white/20"
+        >
+          Toca para activar sonido
+        </button>
+      )}
+
       {loading && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-stadium/60">
           <LoadingSpinner label="Cargando señal HD..." />
         </div>
       )}
 
-      {offside && !loading && <OffsideBanner onRetry={handleRetry} />}
+      {unsupported && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-stadium/80 px-6 text-center">
+          <p className="text-sm text-white/80">Tu navegador no soporta reproducción HLS.</p>
+          <p className="text-xs text-white/50">Prueba Chrome, Edge o Safari.</p>
+        </div>
+      )}
+
+      {offside && !loading && !unsupported && <OffsideBanner onRetry={handleRetry} />}
 
       <div
         className={`absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-black/85 via-black/45 to-transparent px-5 pb-4 pt-20 transition-opacity duration-300 ${
-          hovering || isFullscreen ? 'opacity-100' : 'opacity-0'
+          controlsShown ? 'opacity-100' : 'opacity-0'
         }`}
       >
         <p className="mb-3 truncate text-sm font-medium text-white/85">{channelName}</p>
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={togglePlay}
+            onClick={(e) => {
+              e.stopPropagation();
+              togglePlay();
+            }}
             className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition hover:bg-electric"
             aria-label={playing ? 'Pausar' : 'Reproducir'}
           >
@@ -254,7 +392,10 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
 
           <button
             type="button"
-            onClick={toggleMute}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleMute();
+            }}
             className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition hover:bg-electric"
             aria-label={muted ? 'Activar sonido' : 'Silenciar'}
           >
@@ -276,6 +417,7 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
             step={0.05}
             value={muted ? 0 : volume}
             onChange={(e) => handleVolume(Number(e.target.value))}
+            onClick={(e) => e.stopPropagation()}
             className="h-1 w-24 cursor-pointer appearance-none rounded-full bg-white/20 accent-electric"
             aria-label="Volumen"
           />
@@ -284,7 +426,10 @@ export function StadiumPlayer({ src, channelName, onStreamFailed }: StadiumPlaye
 
           <button
             type="button"
-            onClick={toggleFullscreen}
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleFullscreen();
+            }}
             className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition hover:bg-electric"
             aria-label="Pantalla completa"
           >

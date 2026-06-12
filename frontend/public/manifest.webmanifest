@@ -1,0 +1,18 @@
+{
+  "name": "Fuchibol — Deportes en vivo",
+  "short_name": "Fuchibol",
+  "description": "Canales deportivos en vivo: fútbol LATAM, Win Sports, ESPN, TyC y más.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a1128",
+  "theme_color": "#0a1128",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "/brand/fuchibol-mark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

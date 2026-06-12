@@ -1,6 +1,7 @@
 import { profileByKey, profileForUrl, type ProfileKey, type UpstreamProfile } from '../config/upstream-profiles.js';
 import { AppError } from '../errors/app-error.js';
 import { env } from '../config/env.js';
+import { fetchUpstreamSafe } from '../utils/upstream-guard.js';
 
 export interface UpstreamResponse {
   body: string | Buffer;
@@ -8,24 +9,36 @@ export interface UpstreamResponse {
   isBinary: boolean;
 }
 
+export interface FetchProfileOverrides {
+  referer?: string;
+  origin?: string;
+  userAgent?: string;
+}
+
 export async function fetchUpstream(
   url: string,
   profileKey?: ProfileKey,
-  options: { binary?: boolean; timeoutMs?: number } = {}
+  options: { binary?: boolean; timeoutMs?: number; profileOverrides?: FetchProfileOverrides } = {},
 ): Promise<UpstreamResponse> {
-  const { key, profile } = profileKey
+  const { key, profile: baseProfile } = profileKey
     ? { key: profileKey, profile: profileByKey(profileKey) }
     : profileForUrl(url);
 
   void key;
 
+  const profile: UpstreamProfile = {
+    ...baseProfile,
+    ...(options.profileOverrides?.origin ? { origin: options.profileOverrides.origin } : {}),
+    ...(options.profileOverrides?.referer ? { referer: options.profileOverrides.referer } : {}),
+    ...(options.profileOverrides?.userAgent ? { userAgent: options.profileOverrides.userAgent } : {}),
+  };
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 20_000);
 
   try {
-    const response = await fetch(url, {
+    const response = await fetchUpstreamSafe(url, {
       signal: controller.signal,
-      redirect: 'follow',
       headers: buildHeaders(profile),
     });
 

@@ -73,8 +73,17 @@ function deriveStatus(
   return 'ok';
 }
 
+function shouldSkipAudit(channelId: string): boolean {
+  const prev = auditStore.get(channelId);
+  if (!prev || prev.failCount < env.streamAuditFailThreshold) return false;
+  const age = Date.now() - new Date(prev.lastChecked).getTime();
+  return age < env.streamAuditBackoffMs;
+}
+
 async function auditChannel(channelId: string): Promise<ChannelAudit> {
   const prev = auditStore.get(channelId);
+  if (shouldSkipAudit(channelId) && prev) return prev;
+
   const start = Date.now();
 
   try {
@@ -158,7 +167,7 @@ async function runBackgroundAuditSlice(): Promise<void> {
 
   try {
     const { data: channels } = channelsCache.get();
-    const allIds = channels.map((c) => c.id);
+    const allIds = channels.map((c) => c.id).filter((id) => !shouldSkipAudit(id));
     if (allIds.length === 0) return;
 
     const batch: string[] = [];

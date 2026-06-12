@@ -1,22 +1,35 @@
 import type Hls from 'hls.js';
 
-/** Config orientada a máxima calidad visual (no ultra-low-latency). */
+function isMobileDevice(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia('(max-width: 768px)').matches;
+}
+
+/** Calidad HD prioritaria con buffer estable (menos cortes). */
 export function createHlsInstance(HlsClass: typeof Hls): Hls {
+  const mobile = isMobileDevice();
+
   return new HlsClass({
     enableWorker: true,
     lowLatencyMode: false,
     capLevelToPlayerSize: false,
     capLevelOnFPSDrop: false,
     startLevel: -1,
-    abrEwmaDefaultEstimate: 50_000_000,
-    abrBandWidthFactor: 0.95,
-    abrBandWidthUpFactor: 0.85,
-    maxBufferLength: 60,
-    maxMaxBufferLength: 120,
-    backBufferLength: 90,
-    maxBufferSize: 80 * 1000 * 1000,
+    abrEwmaDefaultEstimate: mobile ? 8_000_000 : 50_000_000,
+    abrBandWidthFactor: 0.92,
+    abrBandWidthUpFactor: 0.8,
+    maxBufferLength: mobile ? 40 : 55,
+    maxMaxBufferLength: mobile ? 70 : 100,
+    backBufferLength: mobile ? 45 : 75,
+    maxBufferSize: mobile ? 45 * 1000 * 1000 : 75 * 1000 * 1000,
     maxBufferHole: 0.5,
-    nudgeMaxRetry: 6,
+    nudgeMaxRetry: 8,
+    fragLoadingMaxRetry: 8,
+    fragLoadingRetryDelay: 1000,
+    manifestLoadingMaxRetry: 6,
+    manifestLoadingRetryDelay: 1000,
+    levelLoadingMaxRetry: 4,
+    startFragPrefetch: true,
   });
 }
 

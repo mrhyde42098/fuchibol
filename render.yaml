@@ -14,9 +14,41 @@ services:
         sync: false
       - key: TOKEN_SECRET
         generateValue: true
+      - key: TOKEN_TTL_MS
+        value: "7200000"
       - key: STREAM_AUDIT_ENABLED
         value: "true"
+      - key: STREAM_AUDIT_PRIORITY_INTERVAL_MS
+        value: "90000"
+      - key: STREAM_AUDIT_BACKGROUND_INTERVAL_MS
+        value: "60000"
+      - key: STREAM_AUDIT_BACKGROUND_BATCH
+        value: "5"
+      - key: STREAM_AUDIT_BACKOFF_MS
+        value: "600000"
+      - key: IPTV_MIRROR_ENABLED
+        value: "true"
+      - key: THESPORTSDB_ENABLED
+        value: "true"
+      - key: THESPORTSDB_API_KEY
+        sync: false
+      - key: THESPORTSDB_MINIMAL_MODE
+        value: "true"
+      - key: ESPN_AGENDA_ENABLED
+        value: "true"
+      - key: FUTBOL_LIBRE_ENABLED
+        value: "true"
+      - key: PROFILE_THETVAPP_ORIGIN
+        value: https://thetvapp.to
+      - key: PROFILE_THETVAPP_REFERER
+        value: https://thetvapp.to/
       - key: FALLBACK_CHANNELS_PATH
         value: golea-analysis/channels.json
       - key: FALLBACK_AGENDA_PATH
         value: golea-analysis/agenda.json
+      - key: RATE_LIMIT_MAX
+        value: "300"
+      - key: RATE_LIMIT_STREAM_MAX
+        value: "40"
+      - key: RATE_LIMIT_PROXY_MAX
+        value: "600"

@@ -1,0 +1,52 @@
+{
+  "app": "PKPlay / Purakura Play v1.1.9",
+  "stack": "Flutter + media_kit (HLS)",
+  "streamModel": "Xtream Codes — requiere servidor, usuario y contraseña del proveedor; no hay URLs de stream en la APK",
+  "integratedInFuchibol": {
+    "espnAgenda": "backend/src/services/espn-agenda.service.ts",
+    "agendaMerge": "backend/src/services/agenda.service.ts",
+    "channelMappings": "backend/src/services/agenda-channels.service.ts"
+  },
+  "iptvSourcesIntegrated": {
+    "sportsCategory": "https://iptv-org.github.io/iptv/categories/sports.m3u",
+    "countries": ["co", "ar", "mx", "br", "pe", "cl", "ve", "ec", "us", "es"],
+    "spanish": "https://iptv-org.github.io/iptv/languages/spa.m3u",
+    "highlights": {
+      "winSports1080": "http://190.60.40.34:8001/play/a0ef",
+      "winPlusFutbol": "http://190.60.40.34:8001/play/a02r",
+      "tycSports1080": "amagi.tv TyC Sports playlist",
+      "foxSports11280": "Fox Sports 1 (1280p) en sports.m3u",
+      "espnDeportes": "origin.thetvapp.to/hls/espn-deportes/mono.m3u8"
+    }
+  },
+  "publicApis": {
+    "espnScoreboards": "https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/scoreboard",
+    "espnLeagues": [
+      "soccer/col.1",
+      "soccer/arg.1",
+      "soccer/mex.1",
+      "soccer/bra.1",
+      "soccer/conmebol.libertadores",
+      "soccer/conmebol.sudamericana",
+      "soccer/usa.1",
+      "soccer/uefa.champions",
+      "soccer/esp.1",
+      "baseball/mlb",
+      "basketball/nba",
+      "hockey/nhl"
+    ],
+    "mlbStats": "https://statsapi.mlb.com/api/v1/schedule",
+    "theSportsDb": "https://www.thesportsdb.com/api/v1/json/3",
+    "pkplayPanelConfig": "https://panel-purakuraplay.vercel.app/api/config",
+    "avatarCatalog": "https://descargas.purakuraplay.com/avatars/catalog_v1.json"
+  },
+  "xtreamEndpoints": [
+    "/player_api.php",
+    "/live/{user}/{pass}/{streamId}.m3u8",
+    "/get.php?username=&password=&type=m3u_plus"
+  ],
+  "dnsOverHttps": [
+    "https://cloudflare-dns.com/dns-query",
+    "https://dns.google/resolve"
+  ]
+}

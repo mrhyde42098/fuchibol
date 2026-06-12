@@ -5,11 +5,18 @@ import { AppError } from '../errors/app-error.js';
 
 export type TokenType = 'manifest' | 'segment';
 
+export interface TokenHeaderOverrides {
+  referer?: string;
+  origin?: string;
+  userAgent?: string;
+}
+
 export interface TokenPayload {
   type: TokenType;
   url: string;
   profile: ProfileKey;
   exp: number;
+  headers?: TokenHeaderOverrides;
 }
 
 function base64UrlEncode(data: string): string {
@@ -28,13 +35,15 @@ export function createToken(
   type: TokenType,
   url: string,
   profile: ProfileKey,
-  ttlMs = env.tokenTtlMs
+  ttlMs = env.tokenTtlMs,
+  headers?: TokenHeaderOverrides,
 ): string {
   const payload: TokenPayload = {
     type,
     url,
     profile,
     exp: Date.now() + ttlMs,
+    ...(headers && (headers.referer || headers.origin || headers.userAgent) ? { headers } : {}),
   };
   const payloadB64 = base64UrlEncode(JSON.stringify(payload));
   const sig = sign(payloadB64);
@@ -78,8 +87,13 @@ export function verifyToken(token: string, expectedType: TokenType): TokenPayloa
   return payload;
 }
 
-export function buildProxyUrl(type: TokenType, url: string, profile: ProfileKey): string {
-  const token = createToken(type, url, profile);
+export function buildProxyUrl(
+  type: TokenType,
+  url: string,
+  profile: ProfileKey,
+  headers?: TokenHeaderOverrides,
+): string {
+  const token = createToken(type, url, profile, env.tokenTtlMs, headers);
   const path = type === 'manifest' ? '/api/proxy/manifest' : '/api/proxy/segment';
   return `${env.publicBaseUrl}${path}?s=${encodeURIComponent(token)}`;
 }

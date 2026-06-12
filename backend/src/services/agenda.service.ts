@@ -1,10 +1,22 @@
 import type { AgendaEvent } from '../types/agenda.js';
+import {
+  mergeAgendaBySource,
+  scrapeFutbolLibreAgenda,
+} from '../scrapers/futbol-libre.scraper.js';
 import { scrapePelotaLibreAgenda } from '../scrapers/pelota-libre.scraper.js';
 import { logger } from '../utils/logger.js';
 import { env } from '../config/env.js';
 import { readFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  attachSuggestedChannels,
+  isAgendaEventRelevant,
+} from './agenda-channels.service.js';
+import {
+  fetchEspnAgendaEvents,
+  isEspnEventFinished,
+} from './espn-agenda.service.js';
 import {
   fetchRelevantTsdbEvents,
   getTsdbEventStart,
@@ -100,11 +112,20 @@ function todayDateStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+function normalizeTitleKey(title: string): string {
+  return title
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
 function isFinishedAgendaEvent(ev: AgendaEvent, tsdb?: TSDbEvent): boolean {
   if (tsdb && isTsdbEventFinished(tsdb)) return true;
+  if (isEspnEventFinished(ev)) return true;
 
   const status = ev.status.toUpperCase();
-  if (status.includes('FIN') || status.includes('FT')) return true;
+  if (status.includes('FIN') || status.includes('FT') || status.includes('FINALIZADO')) return true;
 
   const today = todayDateStr();
   if (ev.date < today) return true;
@@ -162,11 +183,28 @@ async function loadFallbackAgenda(): Promise<AgendaEvent[]> {
 }
 
 async function loadBaseAgenda(): Promise<AgendaEvent[]> {
-  try {
-    const events = await scrapePelotaLibreAgenda();
-    if (events.length > 0) return events;
-  } catch (err) {
-    logger.warn({ err }, 'Agenda scraper failed');
+  const [pelota, futbolLibre] = await Promise.allSettled([
+    scrapePelotaLibreAgenda(),
+    env.futbolLibreEnabled ? scrapeFutbolLibreAgenda() : Promise.resolve([]),
+  ]);
+
+  const pelotaEvents = pelota.status === 'fulfilled' ? pelota.value : [];
+  const futbolEvents = futbolLibre.status === 'fulfilled' ? futbolLibre.value : [];
+
+  if (pelota.status === 'rejected') {
+    logger.warn({ err: pelota.reason }, 'Pelota Libre agenda failed');
+  }
+  if (futbolLibre.status === 'rejected') {
+    logger.warn({ err: futbolLibre.reason }, 'Futbol Libre agenda failed');
+  }
+
+  if (pelotaEvents.length > 0 || futbolEvents.length > 0) {
+    const merged = mergeAgendaBySource(pelotaEvents, futbolEvents);
+    logger.info(
+      { pelota: pelotaEvents.length, futbolLibre: futbolEvents.length, merged: merged.length },
+      'Agenda scraped',
+    );
+    return merged;
   }
 
   try {
@@ -232,6 +270,23 @@ export async function loadEnrichedAgenda(): Promise<AgendaEvent[]> {
     matchedTsdbIds.add(t.idEvent);
   }
 
+  if (env.espnAgendaEnabled) {
+    const espnEvents = await fetchEspnAgendaEvents().catch(() => []);
+    const seenKeys = new Set(active.map((ev) => `${normalizeTitleKey(ev.title)}:${ev.date}`));
+
+    for (const ev of espnEvents) {
+      if (isFinishedAgendaEvent(ev)) continue;
+      const key = `${normalizeTitleKey(ev.title)}:${ev.date}`;
+      if (seenKeys.has(key)) continue;
+      seenKeys.add(key);
+      active.push(ev);
+    }
+  }
+
+  active = active
+    .map(attachSuggestedChannels)
+    .filter(isAgendaEventRelevant);
+
   active.sort((a, b) => {
     const sa = getEventStart(a)?.getTime() ?? Number.MAX_SAFE_INTEGER;
     const sb = getEventStart(b)?.getTime() ?? Number.MAX_SAFE_INTEGER;
@@ -239,7 +294,12 @@ export async function loadEnrichedAgenda(): Promise<AgendaEvent[]> {
   });
 
   logger.info(
-    { base: base.length, tsdb: tsdbEvents.length, active: active.length },
+    {
+      base: base.length,
+      tsdb: tsdbEvents.length,
+      espn: env.espnAgendaEnabled,
+      active: active.length,
+    },
     'Agenda enriched',
   );
 

@@ -8,17 +8,18 @@ const POPULAR_SLUGS = new Set([
 ]);
 
 export const CHANNEL_GROUPS = [
-  { id: 'premium', label: 'Premium HD', icon: '★' },
-  { id: 'win', label: 'Win Sports', icon: '⚽' },
-  { id: 'espn', label: 'ESPN', icon: '📺' },
-  { id: 'fox', label: 'Fox Sports', icon: '🦊' },
-  { id: 'streaming', label: 'Streaming', icon: '▶' },
-  { id: 'mexico', label: 'México', icon: '🇲🇽' },
-  { id: 'colombia', label: 'Colombia', icon: '🇨🇴' },
-  { id: 'argentina', label: 'Argentina', icon: '🇦🇷' },
-  { id: 'brasil', label: 'Brasil', icon: '🇧🇷' },
-  { id: 'usa', label: 'USA', icon: '🇺🇸' },
-  { id: 'otros', label: 'Más canales', icon: '···' },
+  { id: 'premium', label: 'Premium HD', logoKey: 'premium' },
+  { id: 'win', label: 'Win Sports', logoKey: 'winsports' },
+  { id: 'espn', label: 'ESPN', logoKey: 'espn' },
+  { id: 'fox', label: 'Fox Sports', logoKey: 'foxsports' },
+  { id: 'streaming', label: 'Streaming', logoKey: 'disney1' },
+  { id: 'mexico', label: 'México', logoKey: 'tudnmx' },
+  { id: 'colombia', label: 'Colombia', logoKey: 'premium-v2-winsports' },
+  { id: 'peru', label: 'Perú', logoKey: 'tvtvhd-golperu' },
+  { id: 'argentina', label: 'Argentina', logoKey: 'premium-v2-tycsports' },
+  { id: 'brasil', label: 'Brasil', logoKey: 'sporttvbr1' },
+  { id: 'usa', label: 'USA', logoKey: 'fs1usa' },
+  { id: 'otros', label: 'Más canales', logoKey: '' },
 ] as const;
 
 export type ChannelGroupId = (typeof CHANNEL_GROUPS)[number]['id'];
@@ -105,13 +106,15 @@ export function countChannelsBySignal(channels: Channel[]): Record<SignalFilter,
 export function getChannelGroup(ch: Channel): ChannelGroupId {
   const hay = `${ch.id} ${ch.name}`.toLowerCase();
 
-  if (/win\s*sport|winsport|winsports/.test(hay)) return 'win';
+  if (/win\s*sport|winsport|winsports|win\+|winplus/.test(hay)) return 'win';
+  if (/golperu|liga\s*1\s*max|liga1max|movistar.*pe|america\s*tv\s*pe/.test(hay)) return 'peru';
   if (/espn/.test(hay)) return 'espn';
   if (/fox\s*sport|foxdeportes|f2usa|fs1usa/.test(hay)) return 'fox';
   if (/disney|vix|paramount|peacock|amazon|prime/.test(hay)) return 'streaming';
   if (/tudn|azteca|canal\s*5|unimas|mex|_mx/.test(hay)) return 'mexico';
-  if (/caracol|rcn|win|liga\s*1|golperu/.test(hay) && !/win\s*sport/.test(hay)) return 'colombia';
-  if (/tyc|dsport|tnt\s*sport|telefe|movistar/.test(hay)) return 'argentina';
+  if (/caracol|rcn|deportes\s*rcn|ligabetplay|betplay/.test(hay)) return 'colombia';
+  if (/tyc|dsport|tnt\s*sport|telefe/.test(hay)) return 'argentina';
+  if (/movistar/.test(hay) && !/pe/.test(hay)) return 'argentina';
   if (/sportv|premiere|caz[eé]tv|sporttv/.test(hay)) return 'brasil';
   if (/usa|telemundo|univision|mlb|nba|nhl/.test(hay)) return 'usa';
   if (/premium|tvtvhd/.test(hay)) return 'premium';

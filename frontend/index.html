@@ -2,17 +2,58 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/brand/fuchibol-mark.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/brand/fuchibol-mark.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Fuchibol — Transmisiones deportivas en vivo" />
+    <meta name="description" content="Fuchibol — Canales deportivos en vivo: fútbol LATAM, Win Sports, ESPN, TyC, Fox y más." />
     <meta name="theme-color" content="#0a1128" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Fuchibol — Deportes en vivo" />
+    <meta property="og:description" content="Mira torneos y canales deportivos en vivo. Win Sports, ESPN, TyC Sports, Fox y agenda del día." />
+    <meta property="og:image" content="/brand/og-image.svg" />
+    <meta property="og:locale" content="es" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Fuchibol — Deportes en vivo" />
+    <meta name="twitter:description" content="Canales deportivos en vivo para LATAM" />
+    <meta name="twitter:image" content="/brand/og-image.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet" />
     <title>Fuchibol — En Vivo</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div
+        id="boot-splash"
+        style="
+          display: flex;
+          min-height: 100vh;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 1rem;
+          background: #0a1128;
+          color: #ffffff;
+          font-family: system-ui, sans-serif;
+        "
+      >
+        <img src="/brand/fuchibol-mark.svg" alt="" width="48" height="48" />
+        <p style="margin: 0; font-size: 0.875rem; opacity: 0.7">Cargando Fuchibol...</p>
+      </div>
+    </div>
+    <style>
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+    <noscript>
+      <p style="color: white; background: #0a1128; padding: 2rem; text-align: center">
+        Fuchibol necesita JavaScript activado.
+      </p>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
